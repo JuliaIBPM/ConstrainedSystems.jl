@@ -3,6 +3,7 @@
 ```@meta
 DocTestSetup = quote
 using ConstrainedSystems
+using CartesianGrids
 end
 ```
 
@@ -20,6 +21,7 @@ end
 
 ```@setup create
 using ConstrainedSystems
+using CartesianGrids
 using Plots
 ```
 `ConstrainedSystems` is equipped with a few classes of time marching schemes for advancing time-dependent
@@ -99,11 +101,11 @@ We can now construct the integrator. We supply a form of the state vector (for u
   definitions of the integrating factor and the right-hand side function:
 
 ```@repl march
-ifrk = IFRK(u,Δt,plan_intfact,r₁,rk=TimeMarching.RK31)
+ifrk = IFRK(u,Δt,plan_intfact,r₁,rk=ConstrainedSystems.RK31)
 ```
 
 We have set the time step size to $0.01$. We have also specified that the Runge-Kutta method to be used is a third-order method, `RK31`, specially designed for storing as few different versions of the integrating factor as necessary. This is actually the default method, so we could have omitted this keyword
-argument. There are other choices, as well, such as `TimeMarching.Euler` for the
+argument. There are other choices, as well, such as `ConstrainedSystems.Euler` for the
 forward Euler method.
 
 Now we can solve the system. The integrator has a simple form, accepting as arguments
@@ -203,7 +205,7 @@ on data of type `f` and `u`, respectively (which, in this case, are matrices `Hm
 and a tuple of the right-hand side functions.
 
 ```@repl march
-ifherk = IFHERK(u,f,Δt,plan_intfact,plan_constraints,(r₁,r₂),rk=TimeMarching.Euler)
+ifherk = IFHERK(u,f,Δt,plan_intfact,plan_constraints,(r₁,r₂),rk=ConstrainedSystems.Euler)
 ```
 
 Here we've set the method to forward Euler. The resulting integrator accepts

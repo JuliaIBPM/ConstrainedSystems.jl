@@ -2,6 +2,7 @@
 
 ```@meta
 DocTestSetup = quote
+using CartesianGrids
 using ConstrainedSystems
 end
 ```
@@ -20,6 +21,7 @@ end
 
 ```@setup create
 using ConstrainedSystems
+using CartesianGrids
 using Plots
 ```
 Saddle systems comprise an important part of solving mechanics problems with
