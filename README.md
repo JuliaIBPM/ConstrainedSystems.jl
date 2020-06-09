@@ -10,7 +10,10 @@ _Tools for solving constrained dynamical systems_
 This package contains several tools for solving and advancing (large-scale) dynamical systems with constraints. These systems generically have the form
 
 du/dt = A u - B<sub>1</sub><sup>T</sup> f + r<sub>1</sub>(u,t)
-B<sub>2</sub> u = r<sub>2</sub>(u,t), u(0) = u<sub>0</sub>
+
+B<sub>2</sub> u = r<sub>2</sub>(u,t)
+
+u(0) = u<sub>0</sub>
 
 where u is a state vector, A is a linear operator with an associated matrix exponential (integrating factor), and f is a constraint force vector (i.e., Lagrange multipliers).
 
