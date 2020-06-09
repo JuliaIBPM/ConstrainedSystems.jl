@@ -7,7 +7,13 @@ _Tools for solving constrained dynamical systems_
 |  | [![Build Status](https://travis-ci.com/JuliaIBPM/ConstrainedSystems.svg?branch=master)](https://travis-ci.com/JuliaIBPM/ConstrainedSystems.jl) [![Build status](https://ci.appveyor.com/api/projects/status/6tokpjqb4x8999g0?svg=true)](https://ci.appveyor.com/project/JuliaIBPM/constrainedsystems-jl) [![codecov](https://codecov.io/gh/JuliaIBPM/ConstrainedSystems.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/JuliaIBPM/ConstrainedSystems.jl) |
 
 
-This package contains several tools for solving and advancing (large-scale) dynamical systems with constraints. Some of the key components of this package are
+This package contains several tools for solving and advancing (large-scale) dynamical systems with constraints. These systems generically have the form
+
+$$\ddt u = A u - B_1^T f + r_1(u,t), \quad B_2 u = r_2(u,t), \quad u(0) = u_0$$
+
+where $u$ is a state vector, $A$ is a linear operator with an associated matrix exponential (integrating factor), and $f$ is a constraint force vector (i.e., Lagrange multipliers).
+
+Some of the key components of this package are
 
 * Tools for solving linear algebra problems with constraints and associated Lagrange multipliers, known generically as *saddle point systems*. The sizes of these systems might be large.
 
