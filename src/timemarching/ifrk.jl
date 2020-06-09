@@ -59,7 +59,7 @@ function (::Type{IFRK})(u::TU,Δt::Float64,
     if TU <: Tuple
       (FI <: Tuple && length(plan_intfact) == length(u)) ||
                 error("plan_intfact argument must be a tuple")
-      Hlist = map(dc -> map((plan,ui) -> plan(dc*Δt,ui),plan_intfact,u),unique(dclist))                
+      Hlist = map(dc -> map((plan,ui) -> plan(dc*Δt,ui),plan_intfact,u),unique(dclist))
     else
       Hlist = map(dc -> plan_intfact(dc*Δt,u),unique(dclist))
     end
@@ -90,7 +90,7 @@ end
 # Advance the IFRK solution by one time step
 # This form works when u is a tuple of state vectors
 function (scheme::IFRK{NS,FH,FR1,TU})(t::Float64,u::TU) where {NS,FH,FR1,TU <: Tuple}
-  @get scheme (Δt,rk,H,r₁,qᵢ,w)
+  @unpack Δt,rk,H,r₁,qᵢ,w = scheme
 
   # H[i] corresponds to H(i,i+1) = H((cᵢ - cᵢ₋₁)Δt)
   # Each of the coefficients includes the time step size
@@ -161,7 +161,7 @@ end
 
 # Advance the IFRK solution by one time step
 function (scheme::IFRK{NS,FH,FR1,TU})(t::Float64,u::TU) where {NS,FH,FR1,TU}
-  @get scheme (Δt,rk,H,r₁,qᵢ,w)
+  @unpack Δt,rk,H,r₁,qᵢ,w = scheme
 
   # H[i] corresponds to H(i,i+1) = H((cᵢ - cᵢ₋₁)Δt)
   # Each of the coefficients includes the time step size

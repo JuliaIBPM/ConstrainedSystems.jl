@@ -13,7 +13,7 @@ using LinearAlgebra
   T = 0:Δt:10
   u = [u₀]
   r₁(u::Vector{Float64},t::Float64) = cos(ω*t)
-  rk = RK(u,Δt,r₁,rk=RK31)
+  rk = RK(u,Δt,r₁,rk=ConstrainedSystems.RK31)
 
   u = [u₀]
   uhist = Float64[]
@@ -39,7 +39,7 @@ using LinearAlgebra
   T = 0:Δt:10
   u = [u₀]
   r₁(u::Vector{Float64},t::Float64) = cos(ω*t)
-  ifrk = IFRK(u,Δt,plan_intfact,r₁,rk=RK31)
+  ifrk = IFRK(u,Δt,plan_intfact,r₁,rk=ConstrainedSystems.RK31)
 
   u = [u₀]
   uhist = Float64[]
@@ -65,7 +65,7 @@ using LinearAlgebra
   r₂(u::Vector{Float64},t::Float64) = Vector{Float64}()
   plan_constraints(u::Vector{Float64},t::Float64) = f -> zeros(Float64,1), u -> Vector{Float64}()
   CartesianGrids.plan_intfact(t::Float64,u::Vector{Float64}) = Matrix(1.0I,1,1)
-  ifherk = IFHERK(u,f,Δt,plan_intfact,plan_constraints,(r₁,r₂),rk=RK31)
+  ifherk = IFHERK(u,f,Δt,plan_intfact,plan_constraints,(r₁,r₂),rk=ConstrainedSystems.RK31)
 
   u = [u₀]
   uhist = Float64[]

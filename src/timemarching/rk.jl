@@ -67,7 +67,7 @@ end
 # Advance the RK solution by one time step
 # This form works when u is a tuple of state vectors
 function (scheme::RK{NS,FR1,TU})(t::Float64,u::TU) where {NS,FR1,TU <: Tuple}
-  @get scheme (Δt,rk,r₁,qᵢ,w)
+  @unpack Δt,rk,r₁,qᵢ,w = scheme
 
   # Each of the coefficients includes the time step size
 
@@ -127,7 +127,7 @@ end
 
 # Advance the RK solution by one time step
 function (scheme::RK{NS,FR1,TU})(t::Float64,u::TU) where {NS,FR1,TU}
-  @get scheme (Δt,rk,r₁,qᵢ,w)
+  @unpack Δt,rk,r₁,qᵢ,w = scheme
 
   # Each of the coefficients includes the time step size
 

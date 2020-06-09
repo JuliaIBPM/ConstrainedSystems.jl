@@ -1,5 +1,4 @@
-import ViscousFlow: SaddlePointSystems
-
+using CartesianGrids
 using LinearAlgebra
 
 @testset "Saddle-Point Systems" begin
@@ -84,41 +83,41 @@ using LinearAlgebra
 
     uvec = zeros(length(w))
 
-    Lop = linear_map(L,w)
+    Lop = ConstrainedSystems.linear_map(L,w)
 
     u = L*w
 
     uvec = Lop*wvec
 
-    @test _wrap_vec(uvec,u) == u
+    @test ConstrainedSystems._wrap_vec(uvec,u) == u
 
-    Linv = linear_inverse_map(L,w)
+    Linv = ConstrainedSystems.linear_inverse_map(L,w)
 
     yvec = Linv*wvec
 
     y = L\w
 
-    @test _wrap_vec(yvec,y) == y
+    @test ConstrainedSystems._wrap_vec(yvec,y) == y
 
     # point-wise operators
     fvec = vec(f)
 
     f[10] = 1.0
-    Hop = linear_map(Hmat,f,w);
+    Hop = ConstrainedSystems.linear_map(Hmat,f,w);
 
     y = Hmat*f
 
     yvec = Hop*fvec
 
-    @test _wrap_vec(yvec,y) == y
+    @test ConstrainedSystems._wrap_vec(yvec,y) == y
 
-    Eop = linear_map(Emat,w,f)
+    Eop = ConstrainedSystems.linear_map(Emat,w,f)
 
     g = Emat*w
 
     gvec = Eop*vec(w)
 
-    @test _wrap_vec(gvec,g) == g
+    @test ConstrainedSystems._wrap_vec(gvec,g) == g
 
   end
 

@@ -10,7 +10,7 @@ import LinearAlgebra: ldiv!, mul!, *, \, I
 
 import Base: size, eltype
 
-export SaddleSystem, SaddleVector, state, constraint
+export SaddleSystem, SaddleVector, state, constraint, linear_map
 export SchurSolverType, Direct, CG, BiCG, GMRES
 
 export System, Constrained, Unconstrained, RK, IFRK, IFHERK, r₁, r₂, B₂, B₁ᵀ,

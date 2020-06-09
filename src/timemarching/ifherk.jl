@@ -230,8 +230,8 @@ end
 # This form works when u is a tuple of state vectors
 function (scheme::IFHERK{NS,FH,FR1,FR2,FC,FS,TU,TF})(t::Float64,u::TU) where
                           {NS,FH,FR1,FR2,FC,FS,TU<:Tuple,TF<:Tuple}
-  @get scheme (rk,rkdt,H,plan_constraints,r₁,r₂,qᵢ,w,fbuffer,ubuffer,tol,
-                _isstaticconstraints,_issymmetric,_schursolver)
+  @unpack rk,rkdt,H,plan_constraints,r₁,r₂,qᵢ,w,fbuffer,ubuffer,tol,
+                _isstaticconstraints,_issymmetric,_schursolver = scheme
 
   # H[i] corresponds to H(i,i+1) = H((cᵢ - cᵢ₋₁)Δt)
   # Each of the coefficients includes the time step size
@@ -363,8 +363,8 @@ end
 # Advance the IFHERK solution by one time step
 function (scheme::IFHERK{NS,FH,FR1,FR2,FC,FS,TU,TF})(t::Float64,u::TU) where
                       {NS,FH,FR1,FR2,FC,FS,TU,TF}
-  @get scheme (rk,rkdt,H,plan_constraints,r₁,r₂,qᵢ,w,fbuffer,ubuffer,tol,
-                    _isstaticconstraints,_issymmetric,_schursolver)
+  @unpack rk,rkdt,H,plan_constraints,r₁,r₂,qᵢ,w,fbuffer,ubuffer,tol,
+                    _isstaticconstraints,_issymmetric,_schursolver = scheme
 
   f = deepcopy(fbuffer)
   sol = SaddleVector(u,f)

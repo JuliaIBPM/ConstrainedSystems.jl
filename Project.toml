@@ -1,4 +1,4 @@
-name = "ConstrainedSystems.jl"
+name = "ConstrainedSystems"
 uuid = "c257ce95-4918-4279-a47c-50fdbcb74a04"
 authors = ["Jeff Eldredge <jdeldre@g.ucla.edu>"]
 repo = "https://github.com/JuliaIBPM/ConstrainedSystems.jl.git"
@@ -14,7 +14,7 @@ UnPack = "3a884ed6-31ef-47d7-9d2a-63182c4928ed"
 [compat]
 IterativeSolvers = "^0"
 LinearMaps = "^2.4"
-RecursiveArrayTools = "^0, 2.3"
+RecursiveArrayTools = "^0, 2.2"
 UnPack = "^0, 1.0"
 julia = "1"
 
