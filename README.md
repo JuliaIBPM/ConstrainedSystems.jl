@@ -7,4 +7,4 @@ This package contains several tools for solving and advancing (large-scale) dyna
 
 * Time integrators that can incorporate these constraints, such as half-explicit Runge-Kutta (HERK) and integrating factor HERK.
 
-
+The package is agnostic to the type of systems, and might arise from, e.g., fluid dynamics or rigid-body mechanics.
