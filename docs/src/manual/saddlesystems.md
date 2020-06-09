@@ -164,16 +164,3 @@ savefig("sfunc.svg"); nothing # hide
 
 The solution shows the streamlines for a circle in vertical motion, as expected.
 All of the streamlines inside the circle are vertical.
-
-## Methods
-
-```@autodocs
-Modules = [SaddlePointSystems]
-Order   = [:type, :function]
-```
-
-## Index
-
-```@index
-Pages = ["saddlesystems.md"]
-```

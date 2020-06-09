@@ -235,16 +235,3 @@ plot(xg,u[65,:],xlabel="x",ylabel="u(x,1)")
 savefig("ifherk-side.svg"); nothing # hide
 ```
 ![](ifherk-side.svg)
-
-## Methods
-
-```@autodocs
-Modules = [TimeMarching]
-Order   = [:type, :function]
-```
-
-## Index
-
-```@index
-Pages = ["timemarching.md"]
-```
