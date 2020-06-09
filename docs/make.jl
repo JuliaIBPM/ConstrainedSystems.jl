@@ -29,7 +29,7 @@ makedocs(
 
 #if "DOCUMENTER_KEY" in keys(ENV)
 deploydocs(
-     repo = "github.com/JuliaIBPM/CartesianGrids.jl.git",
+     repo = "github.com/JuliaIBPM/ConstrainedSystems.jl.git",
      target = "build",
      deps = nothing,
      make = nothing
