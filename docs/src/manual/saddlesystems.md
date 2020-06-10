@@ -93,6 +93,7 @@ n = 128; θ = range(0,stop=2π,length=n+1);
 xb = 1.0 .+ 0.5*cos.(θ[1:n]); yb = 1.0 .+ 0.5*sin.(θ[1:n]);
 X = VectorData(xb,yb);
 ψb = ScalarData(X);
+f = similar(ψb);
 ```
 
 Now let's set up a grid of size $102\times 102$ (including the usual layer
@@ -101,6 +102,7 @@ of ghost cells) and physical dimensions $2\times 2$.
 ```@repl saddle
 nx = 102; ny = 102; Lx = 2.0; dx = Lx/(nx-2);
 w = Nodes(Dual,(nx,ny));
+ψ = similar(w);
 ```
 
 We need to set up the operators now. First, the Laplacian:
@@ -117,11 +119,12 @@ regop = Regularize(X,dx;issymmetric=true)
 Rmat, Emat = RegularizationMatrix(regop,ψb,w);
 ```
 
-Now we are ready to set up the system. The right-hand side vector
-is set up using `SaddleVector`.
+Now we are ready to set up the system. The solution and right-hand side vectors
+are set up using `SaddleVector`.
 
 ```@repl saddle
 rhs = SaddleVector(w,ψb)
+sol = SaddleVector(ψ,f)
 ```
 and the saddle system is then set up with the three operators; the $C$ operator
 is presumed to be zero when it is not provided.

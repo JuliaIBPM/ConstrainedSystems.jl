@@ -72,10 +72,10 @@ uex(t) = u₀*exp(-α*t) + (α*(cos(ω*t)-exp(-α*t))+ω*sin(ω*t))/(α^2+ω^2)
 ```
 
 The first steps are to define operators that provide the integrating factor and the right-hand side
-of the equations. For the integrating factor, we define
+of the equations. For the integrating factor, we define an extended form of `plan_intfact`
 
 ```@repl march
-plan_intfact(t::Float64,u::Vector{Float64}) = exp(-α*t);
+CartesianGrids.plan_intfact(t::Float64,u::Vector{Float64}) = exp(-α*t);
 ```
 
 Note that we have defined this form of `plan_intfact` to adhere to the standard form,
@@ -205,7 +205,8 @@ on data of type `f` and `u`, respectively (which, in this case, are matrices `Hm
 and a tuple of the right-hand side functions.
 
 ```@repl march
-solver = IFHERK(u,f,Δt,plan_intfact,plan_constraints,(r₁,r₂),rk=ConstrainedSystems.Euler)
+solver = IFHERK(u,f,Δt,CartesianGrids.plan_intfact,plan_constraints,(r₁,r₂),
+                rk=ConstrainedSystems.Euler)
 ```
 
 Here we've set the method to forward Euler. The resulting integrator accepts
