@@ -21,6 +21,8 @@ Some of the key components of this package are
 
 * Tools for solving linear algebra problems with constraints and associated Lagrange multipliers, known generically as *saddle point systems*. The sizes of these systems might be large.
 
-* Time integrators that can incorporate these constraints, such as half-explicit Runge-Kutta (HERK) and integrating factor HERK.
+* Time integrators that can incorporate these constraints, such as half-explicit Runge-Kutta (HERK) and integrating factor Runge-Kutta (IFRK), or their combination (IF-HERK).
+
+It should be noted that the [DifferentialEquations.jl](https://github.com/SciML/DifferentialEquations.jl) package provides a nearly comprehensive set of tools for differential equations. However, the current package provides functionality for constrained systems.
 
 The package is agnostic to the type of systems, and might arise from, e.g., fluid dynamics or rigid-body mechanics.
