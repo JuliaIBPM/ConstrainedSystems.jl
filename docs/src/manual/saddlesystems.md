@@ -83,6 +83,7 @@ also initialize a data structure for the force:
 
 ```@setup saddle
 using ConstrainedSystems
+using CartesianGrids
 using Plots
 pyplot()
 ```
@@ -116,8 +117,8 @@ regop = Regularize(X,dx;issymmetric=true)
 Rmat, Emat = RegularizationMatrix(regop,ψb,w);
 ```
 
-Now we are ready to set up the system. The solution and right-hand side vectors
-are set up using `SaddleVector`:
+Now we are ready to set up the system. The right-hand side vector
+is set up using `SaddleVector`.
 
 ```@repl saddle
 rhs = SaddleVector(w,ψb)
@@ -146,8 +147,8 @@ this will be discussed in a moment.
 We solve the system with the convenient shorthand of the backslash:
 
 ```@repl saddle
-#sol = A\rhs
-@time sol = A\rhs
+sol .= A\rhs # hide
+@time sol .= A\rhs
 ```
 Just to point out how fast it can be, we have also timed it. It's pretty fast.
 

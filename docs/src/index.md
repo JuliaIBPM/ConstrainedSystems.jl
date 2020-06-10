@@ -15,11 +15,7 @@
 
 This package contains several tools for solving and advancing (large-scale) dynamical systems with constraints. These systems generically have the form
 
-$$\ddt{u} = A u - B_{1}^{T} f + r_{1}(u,t) $$
-
-$$ B_{2} u = r_{2}(u,t) $$
-
-$$u(0) = u_{0}$$
+$$\ddt{u} = A u - B_{1}^{T} f + r_{1}(u,t), \quad B_{2} u = r_{2}(u,t), \quad u(0) = u_{0}$$
 
 where $u$ is a state vector, $A$ is a linear operator with an associated matrix exponential (integrating factor), and $f$ is a constraint force vector (i.e., Lagrange multipliers).
 

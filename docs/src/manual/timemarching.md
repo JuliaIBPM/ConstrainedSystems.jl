@@ -57,6 +57,7 @@ For demonstration, we will set $\alpha = 1$, $\omega = 4$, and $u_0 = 1$.
 
 ```@setup march
 using ConstrainedSystems
+using CartesianGrids
 using Plots
 pyplot()
 ```
@@ -71,14 +72,13 @@ uex(t) = u₀*exp(-α*t) + (α*(cos(ω*t)-exp(-α*t))+ω*sin(ω*t))/(α^2+ω^2)
 ```
 
 The first steps are to define operators that provide the integrating factor and the right-hand side
-of the equations. For the integrating factor, we extend the definition of `plan_intfact`
-from [CartesianGrids](https://juliaibpm.github.io/CartesianGrids.jl/latest/).
+of the equations. For the integrating factor, we define
 
 ```@repl march
-ConstrainedSystems.plan_intfact(t::Float64,u::Vector{Float64}) = exp(-α*t);
+plan_intfact(t::Float64,u::Vector{Float64}) = exp(-α*t);
 ```
 
-Note that we have defined this extended form of `plan_intfact` to adhere to the standard form,
+Note that we have defined this form of `plan_intfact` to adhere to the standard form,
 accepting arguments for time `t` and the state vector `u`, even though the state vector isn't strictly needed here. The state 'vector' in this problem is actually only a scalar, of course. But
 the time marching method does not accept scalar-type states currently, so we will
 make `u` a 1-element vector to use the `ConstrainedSystems` tools.
@@ -205,7 +205,7 @@ on data of type `f` and `u`, respectively (which, in this case, are matrices `Hm
 and a tuple of the right-hand side functions.
 
 ```@repl march
-ifherk = IFHERK(u,f,Δt,plan_intfact,plan_constraints,(r₁,r₂),rk=ConstrainedSystems.Euler)
+solver = IFHERK(u,f,Δt,plan_intfact,plan_constraints,(r₁,r₂),rk=ConstrainedSystems.Euler)
 ```
 
 Here we've set the method to forward Euler. The resulting integrator accepts
@@ -216,7 +216,7 @@ Now, let's advance the system. We'll also time it.
 
 ```@repl march
 @time for i = 1:20
-  global t, u, f = ifherk(t,u)
+  global t, u, f = solver(t,u)
 end
 ```
 
