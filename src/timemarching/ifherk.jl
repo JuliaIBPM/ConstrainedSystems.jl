@@ -270,7 +270,7 @@ function (scheme::IFHERK{NS,FH,FR1,FR2,FC,FS,TU,TF})(t::Float64,u::TU) where
       # could solve this system for the whole tuple, too...
       fill!(f[el],0.0)
       ldiv!(sol[el],S[el],SaddleVector(ubuffer[el],fbuffer[el]))
-      ubuffer[el] .= S[el].A⁻¹B₁ᵀf
+      ubuffer[el] .= TU(S[el].A⁻¹B₁ᵀf)
       #tmp = S[i][el]\(ubuffer[el],fbuffer[el])  # solve saddle point system
       #u[el] .= tmp[1]
       #f[el] .= tmp[2]
@@ -307,7 +307,7 @@ function (scheme::IFHERK{NS,FH,FR1,FR2,FC,FS,TU,TF})(t::Float64,u::TU) where
         fbuffer[el] .= ftmp[el]
         fill!(f[el],0.0)
         ldiv!(sol[el],S[el],SaddleVector(ubuffer[el],fbuffer[el]))
-        ubuffer[el] .= S[el].A⁻¹B₁ᵀf
+        ubuffer[el] .= TU(S[el].A⁻¹B₁ᵀf)
 
         #tmp = S[i][el]\(ubuffer[el],fbuffer[el])  # solve saddle point system
         #u[el] .= tmp[1]
@@ -393,7 +393,7 @@ function (scheme::IFHERK{NS,FH,FR1,FR2,FC,FS,TU,TF})(t::Float64,u::TU) where
     fbuffer .= r₂(u,tᵢ₊₁) # r₂
     sol .= S\SaddleVector(ubuffer,fbuffer)  # solve saddle point system
 
-    ubuffer .= S.A⁻¹B₁ᵀf
+    ubuffer .= TU(S.A⁻¹B₁ᵀf)
     tᵢ₊₁ = t + rkdt.c[i]
 
     # diffuse the scratch vectors
@@ -417,7 +417,7 @@ function (scheme::IFHERK{NS,FH,FR1,FR2,FC,FS,TU,TF})(t::Float64,u::TU) where
       end
       fbuffer .= r₂(u,tᵢ₊₁) # r₂
       sol .= S\SaddleVector(ubuffer,fbuffer)  # solve saddle point system
-      ubuffer .= S.A⁻¹B₁ᵀf
+      ubuffer .= TU(S.A⁻¹B₁ᵀf)
       tᵢ₊₁ = t + rkdt.c[i]
 
       #ldiv!((u,f),S[i],(ubuffer,fbuffer)) # solve saddle point system
