@@ -55,7 +55,7 @@ Order-1 IF-HERK integrator with
    Time step size 1.0</code></pre><p>Here we&#39;ve set the method to forward Euler. The resulting integrator accepts as arguments the current time <code>t</code> and the current state <code>u</code>, and returns the time, state, and Lagrange multiplier data at the end of the time step.</p><p>Now, let&#39;s advance the system. We&#39;ll also time it.</p><pre><code class="language-julia-repl">julia&gt; @time for i = 1:20
          global t, u, f = solver(t,u)
        end
-  1.026578 seconds (2.33 M allocations: 143.897 MiB, 3.85% gc time)</code></pre><p>Now let&#39;s plot it</p><pre><code class="language-julia-repl">julia&gt; xg, yg = coordinates(u,dx=Δx);
+  1.099104 seconds (2.33 M allocations: 144.050 MiB, 4.46% gc time)</code></pre><p>Now let&#39;s plot it</p><pre><code class="language-julia-repl">julia&gt; xg, yg = coordinates(u,dx=Δx);
 
 julia&gt; plot(xg,yg,u)
 ┌ Warning: Attribute alias `xlim` detected in the user recipe defined for the signature (::StepRangeLen{Float64,Base.TwicePrecision{Float64},Base.TwicePrecision{Float64}}, ::StepRangeLen{Float64,Base.TwicePrecision{Float64},Base.TwicePrecision{Float64}}, ::CartesianGrids.Nodes{CartesianGrids.Dual,129,129,Float64,Array{Float64,2}}). To ensure expected behavior it is recommended to use the default attribute `xlims`.
