@@ -2,7 +2,7 @@
 
 abstract type SchurSolverType end
 
-struct SaddleSystem{T,Ns,Nc,TF,TU,TS<:SchurSolverType}
+struct SaddleSystem{T,Ns,Nc,TU,TF,TS<:SchurSolverType}
     A :: LinearMap{T}
     B₂ :: LinearMap{T}
     B₁ᵀ :: LinearMap{T}
