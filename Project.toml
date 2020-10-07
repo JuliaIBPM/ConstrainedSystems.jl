@@ -12,7 +12,7 @@ RecursiveArrayTools = "731186ca-8d62-57ce-b412-fbd966d074cd"
 UnPack = "3a884ed6-31ef-47d7-9d2a-63182c4928ed"
 
 [compat]
-IterativeSolvers = "0, 1"
+IterativeSolvers = "0.8"
 LinearMaps = "^2.4"
 RecursiveArrayTools = "2.2"
 UnPack = "1.0"
