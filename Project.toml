@@ -2,7 +2,7 @@ name = "ConstrainedSystems"
 uuid = "c257ce95-4918-4279-a47c-50fdbcb74a04"
 authors = ["Jeff Eldredge <jdeldre@g.ucla.edu>"]
 repo = "https://github.com/JuliaIBPM/ConstrainedSystems.jl.git"
-version = "0.1.1"
+version = "0.1.2"
 
 [deps]
 IterativeSolvers = "42fd0dbc-a981-5370-80f2-aaf504508153"
