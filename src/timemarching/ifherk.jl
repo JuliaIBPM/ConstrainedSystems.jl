@@ -226,6 +226,10 @@ function construct_saddlesys(plan_constraints::FC,H::FH,
 
 end
 
+#=
+- Need to update this so that all operators can be updated, including rhs functions
+=#
+
 # Advance the IFHERK solution by one time step
 # This form works when u is a tuple of state vectors
 function (scheme::IFHERK{NS,FH,FR1,FR2,FC,FS,TU,TF})(t::Float64,u::TU) where
