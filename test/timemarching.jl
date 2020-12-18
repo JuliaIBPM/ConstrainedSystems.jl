@@ -114,6 +114,9 @@ using SpecialFunctions
 
   @testset "Basic constrained non-IF using IFHERK" begin
 
+  # pendulum example, solved in Cartesian coordinates to impose constraint
+  # via Lagrange multipliers
+
   θ₀ = 0.0; #π/2+0.002;
   l = 1.0
   g = 1.0
