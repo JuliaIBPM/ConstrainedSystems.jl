@@ -3,33 +3,34 @@ export DiffEqLinearOperator, ConstrainedODEFunction
 #### Operator and function types ####
 
 mutable struct DiffEqLinearOperator{T,aType} <: AbstractDiffEqLinearOperator{T}
-    A :: aType
-    DiffEqLinearOperator(A::aType; update_func=DEFAULT_UPDATE_FUNC,
-                          dtype=Float64) where {aType} = new{dtype,aType}(A)
+    L :: aType
+    DiffEqLinearOperator(L::aType; update_func=DEFAULT_UPDATE_FUNC,
+                          dtype=Float64) where {aType} = new{dtype,aType}(L)
 end
 
-(f::DiffEqLinearOperator)(du,u,p,t) = mul!(du.x[1],f.A,u.x[1])
+(f::DiffEqLinearOperator)(du,u,p,t) = mul!(du.x[1],f.L,u.x[1])
 
 import Base: exp
-exp(f::DiffEqLinearOperator,args...) = exp(f.A,args...)
+exp(f::DiffEqLinearOperator,args...) = exp(f.L,args...)
 has_exp(::DiffEqLinearOperator) = true
 
-exp(A::AbstractMatrix,t,x) = exp(factorize(A)*t)
+exp(L::AbstractMatrix,t,x) = exp(factorize(L)*t)
+exp(L::UniformScaling,t,x) = exp(Diagonal(L,length(x))*t)
 
 """
-        ConstrainedODEFunction(r1,r2,B1,B2[,A=I])
+        ConstrainedODEFunction(r1,r2,B1,B2[,L=zeros])
 
 This specifies the functions and operators that comprise an ODE problem with the form
 
 ``
-\\dfrac{dy}{dt} = Ay - B_1 z + r_1(y,t)
+\\dfrac{dy}{dt} = Ly - B_1 z + r_1(y,t)
 ``
 
 ``
 B_2 y = r_2(t)
 ``
 
-The optional linear operator `A` defaults to the identity. The `B1` and `B2` functions must be of the respective
+The optional linear operator `L` defaults to zeros. The `B1` and `B2` functions must be of the respective
 in-place forms `B1(dy,z,p)` (to compute the action of `B1` on `z`) and `B2(dz,y,p)` (to compute that action
 of `B2` on `y`). The function `r1` must of the in-place form `r1(dy,y,p,t)`, and `r2` must be in the in-place form
 `r2(dz,p,t)`.
@@ -58,7 +59,8 @@ struct ConstrainedODEFunction{iip,static,F1,F2,TMM,C,Ta,Tt,TJ,JVP,VJP,JP,SP,TW,T
     param_update_func :: PF
 end
 
-function ConstrainedODEFunction(r1,r2,B1,B2,A=I; param_update_func = DEFAULT_UPDATE_FUNC,
+function ConstrainedODEFunction(r1,r2,B1,B2,L=DiffEqLinearOperator(0*I);
+                                                 param_update_func = DEFAULT_UPDATE_FUNC,
                                                  mass_matrix=I,_func_cache=nothing,
                                                  analytic=nothing,
                                                  tgrad = nothing,
@@ -89,7 +91,7 @@ function ConstrainedODEFunction(r1,r2,B1,B2,A=I; param_update_func = DEFAULT_UPD
 
     fill!(_func_cache,0.0)
     odef_nl = SplitFunction(r1ext,B1ext_rhs;_func_cache=deepcopy(_func_cache))
-    odef = SplitFunction(A, odef_nl ;_func_cache=deepcopy(_func_cache))
+    odef = SplitFunction(L, odef_nl ;_func_cache=deepcopy(_func_cache))
     conf = SplitFunction(r2ext,B2ext_rhs;_func_cache=deepcopy(_func_cache))
 
     static = param_update_func == DEFAULT_UPDATE_FUNC ? true : false
@@ -104,7 +106,7 @@ function ConstrainedODEFunction(r1,r2,B1,B2,A=I; param_update_func = DEFAULT_UPD
                            sparsity,Wfact,Wfact_t,paramjac,syms,colorvec,param_update_func)
 end
 
-@inline _ode_A!(du,f::ConstrainedODEFunction,u,p,t) = f.odef.f1(du,u,p,t) # A
+@inline _ode_L!(du,f::ConstrainedODEFunction,u,p,t) = f.odef.f1(du,u,p,t) # L
 @inline _ode_r1!(du,f::ConstrainedODEFunction,u,p,t) = f.odef.f2.f.f1(du,u,p,t) # r_1
 
 @inline _ode_neg_B1!(du,f::ConstrainedODEFunction,u,p,t) = f.odef.f2.f.f2(du,u,p,t) # -B_1^T

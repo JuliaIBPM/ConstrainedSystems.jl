@@ -52,7 +52,7 @@ function update_p!(q,u,p,t)
 end
 
 f = ConstrainedODEFunction(ode_rhs!,constraint_rhs!,op_constraint_force!,
-                            constraint_op!,DiffEqLinearOperator(zeros(4,4)),
+                            constraint_op!,
                             _func_cache=deepcopy(du),param_update_func=update_p!)
 tspan = (0.0,1.0)
 p = deepcopy(p₀)
