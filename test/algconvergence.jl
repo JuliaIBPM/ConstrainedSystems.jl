@@ -13,14 +13,13 @@ end
 θ₀ = 0.0
 l = 1.0
 g = 1.0
-m = 1.0
 y₀ = Float64[l*cos(θ₀),l*sin(θ₀),0,0]
 z₀ = Float64[0.0, 0.0]
 
 u₀ = SaddleVector(y₀,z₀)
 du = deepcopy(u₀)
 
-params = [l,g,m]
+params = [l,g]
 p₀ = PendulumParams(params,zeros(Float64,4,2),zeros(Float64,2,4))
 
 function ode_rhs!(dy::Vector{Float64},y::Vector{Float64},p,t)
@@ -51,12 +50,7 @@ function update_p!(q,u,p,t)
     return q
 end
 
-f = ConstrainedODEFunction(ode_rhs!,constraint_rhs!,op_constraint_force!,
-                            constraint_op!,
-                            _func_cache=deepcopy(du),param_update_func=update_p!)
-tspan = (0.0,1.0)
-p = deepcopy(p₀)
-prob = ODEProblem(f,u₀,tspan,p)
+
 
 
 @testset "Convergence test" begin
@@ -79,6 +73,14 @@ probex = ODEProblem(fex,u0,tspan,pex)
 solex = solve(probex, Tsit5(), reltol=1e-16, abstol=1e-16);
 xexact(t) = sin(solex(t,idxs=1))
 yexact(t) = 1.0 - cos(solex(t,idxs=1))
+
+# Set up the problem
+f = ConstrainedODEFunction(ode_rhs!,constraint_rhs!,op_constraint_force!,
+                            constraint_op!,
+                            _func_cache=deepcopy(du),param_update_func=update_p!)
+tspan = (0.0,1.0)
+p = deepcopy(p₀)
+prob = ODEProblem(f,u₀,tspan,p)
 
 
 # For now, do this quick and dirty until we figure out how to separate

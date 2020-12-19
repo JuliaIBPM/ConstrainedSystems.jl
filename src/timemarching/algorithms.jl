@@ -90,9 +90,9 @@ function alg_cache(alg::LiskaIFHERK{sc,solverType},u,rate_prototype,uEltypeNoUni
   Hhalfdt = exp(A,-dt/2,y)
   Hzero = exp(A,zero(dt),y)
 
-  S1 = saddle_system(Hhalfdt,f,p,p,dutmp,solverType)
-  S = [S1]
-  push!(S,saddle_system(Hzero,f,p,p,dutmp,solverType))
+  S = []
+  push!(S,SaddleSystem(Hhalfdt,f,p,p,dutmp,solverType))
+  push!(S,SaddleSystem(Hzero,f,p,p,dutmp,solverType))
 
   LiskaIFHERKCache{sc,solverType}(u,uprev,k1,k2,k3,utmp,dutmp,fsalfirst,Hhalfdt,Hzero,S,deepcopy(p),deepcopy(p),k,tab)
 end
@@ -101,18 +101,15 @@ function alg_cache(alg::LiskaIFHERK,u,rate_prototype,uEltypeNoUnits,uBottomEltyp
   LiskaIFHERKConstantCache(constvalue(uBottomEltypeNoUnits), constvalue(tTypeNoUnits))
 end
 
-function saddle_system(A,f,p,pold,ducache,solver)
+function SaddleSystem(A,f::ConstrainedODEFunction,p,pold,ducache,solver)
     nully, nullz = state(ducache), constraint(ducache)
     B₁ᵀ(z) = (fill!(ducache,0.0); fill!(nully,0.0); -_ode_neg_B1!(ducache,f,ArrayPartition(nully,z),pold,0.0))
     B₂(y) = (fill!(ducache,0.0); fill!(nullz,0.0); -_constraint_neg_B2!(ducache,f,ArrayPartition(y,nullz),p,0.0))
     SaddleSystem(A,B₂,B₁ᵀ,ducache,solver=solver)
 end
 
-@inline saddle_system(Sold::SaddleSystem,A,f,p,pold,ducache,solver,::Val{false}) = saddle_system(A,f,p,pold,ducache,solver)
-@inline saddle_system(Sold::SaddleSystem,A,f,p,pold,ducache,solver,::Val{true}) = Sold
-
-@inline saddle_system!(S::SaddleSystem,A,f,p,pold,ducache,solver,::Val{false}) = (S = saddle_system(A,f,p,pold,ducache,solver); nothing)
-@inline saddle_system!(S::SaddleSystem,A,f,p,pold,ducache,solver,::Val{true}) = nothing
+@inline SaddleSystem(Sold::SaddleSystem,A,f::ConstrainedODEFunction,p,pold,ducache,solver,::Val{false}) = SaddleSystem(A,f,p,pold,ducache,solver)
+@inline SaddleSystem(Sold::SaddleSystem,A,f::ConstrainedODEFunction,p,pold,ducache,solver,::Val{true}) = Sold
 
 function initialize!(integrator,cache::LiskaIFHERKCache)
     @unpack k,fsalfirst = cache
@@ -153,7 +150,7 @@ end
     # if applicable, update p, construct new saddle system here, using Hhalfdt
     recursivecopy!(pold,pnew)
     param_update_func(pnew,u,pold,ttmp)
-    S[1] = saddle_system(S[1],Hhalfdt,f,pnew,pnew,dutmp,solverType,Val(sc))
+    S[1] = SaddleSystem(S[1],Hhalfdt,f,pnew,pnew,dutmp,solverType,Val(sc))
 
     ttmp = t + dt*c̃1
     _constraint_r2!(utmp,f,u,pnew,ttmp) # this should only update the z part
@@ -175,7 +172,7 @@ end
     # if applicable, update p, construct new saddle system here, using Hhalfdt
     recursivecopy!(pold,pnew)
     param_update_func(pnew,u,pold,ttmp)
-    S[1] = saddle_system(S[1],Hhalfdt,f,pnew,pnew,dutmp,solverType,Val(sc))
+    S[1] = SaddleSystem(S[1],Hhalfdt,f,pnew,pnew,dutmp,solverType,Val(sc))
 
     ttmp = t + dt*c̃2
     _constraint_r2!(utmp,f,u,pnew,ttmp)
@@ -195,7 +192,7 @@ end
     # if applicable, update p, construct new saddle system here, using Hzero (identity)
     recursivecopy!(pold,pnew)
     param_update_func(pnew,u,pold,ttmp)
-    S[2] = saddle_system(S[2],Hzero,f,pnew,pnew,dutmp,solverType,Val(sc))
+    S[2] = SaddleSystem(S[2],Hzero,f,pnew,pnew,dutmp,solverType,Val(sc))
 
     _constraint_r2!(utmp,f,u,pnew,t+dt)
     u .= S[2]\utmp
