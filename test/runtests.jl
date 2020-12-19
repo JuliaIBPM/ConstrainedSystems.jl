@@ -4,9 +4,9 @@ using Test
 ##using TestSetExtensions
 
 
-#@test isempty(detect_ambiguities(ViscousFlow))
 include("saddle.jl")
-include("timemarching.jl")
+#include("timemarching.jl")
+include("algconvergence.jl")
 
 
 #@testset ExtendedTestSet "All tests" begin

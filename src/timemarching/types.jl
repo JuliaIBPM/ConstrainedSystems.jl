@@ -1,13 +1,3 @@
-using OrdinaryDiffEq
-import OrdinaryDiffEq: OrdinaryDiffEqAlgorithm, alg_order, alg_cache,
-                    OrdinaryDiffEqMutableCache, OrdinaryDiffEqConstantCache,
-                    initialize!, perform_step!, @muladd, @unpack, constvalue,
-                    full_cache, @..
-
-import OrdinaryDiffEq.DiffEqBase: AbstractDiffEqLinearOperator,
-                                  DEFAULT_UPDATE_FUNC, has_exp,
-                                  AbstractODEFunction, isinplace
-
 export DiffEqLinearOperator, ConstrainedODEFunction
 
 #### Operator and function types ####
@@ -24,6 +14,7 @@ import Base: exp
 exp(f::DiffEqLinearOperator,args...) = exp(f.A,args...)
 has_exp(::DiffEqLinearOperator) = true
 
+exp(A::AbstractMatrix,t,x) = exp(factorize(A)*t)
 
 """
         ConstrainedODEFunction(r1,r2,B1,B2[,A=I])

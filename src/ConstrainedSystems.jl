@@ -3,7 +3,20 @@ module ConstrainedSystems
 using LinearMaps
 using RecursiveArrayTools
 using IterativeSolvers
-using UnPack
+#using UnPack
+using Reexport
+@reexport using OrdinaryDiffEq
+
+import OrdinaryDiffEq: OrdinaryDiffEqAlgorithm, alg_order, alg_cache,
+                    OrdinaryDiffEqMutableCache, OrdinaryDiffEqConstantCache,
+                    initialize!, perform_step!, @muladd, @unpack, constvalue,
+                    full_cache, @..
+
+import OrdinaryDiffEq.DiffEqBase: AbstractDiffEqLinearOperator,
+                                  DEFAULT_UPDATE_FUNC, has_exp,
+                                  AbstractODEFunction, isinplace
+
+
 
 using LinearAlgebra
 import LinearAlgebra: ldiv!, mul!, *, \, I
