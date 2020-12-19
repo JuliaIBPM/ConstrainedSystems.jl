@@ -1,5 +1,6 @@
+using OrdinaryDiffEq
 import OrdinaryDiffEq: OrdinaryDiffEqAlgorithm, alg_order, alg_cache,
-                    OrdinaryDiffEqMutableCache, OrdinaryDiffEqConstantCache, @cache,
+                    OrdinaryDiffEqMutableCache, OrdinaryDiffEqConstantCache,
                     initialize!, perform_step!, @muladd, @unpack, constvalue,
                     full_cache, @..
 
@@ -11,9 +12,6 @@ export DiffEqLinearOperator, ConstrainedODEFunction
 
 #### Operator and function types ####
 
-"""
-$(TYPEDEF)
-"""
 mutable struct DiffEqLinearOperator{T,aType} <: AbstractDiffEqLinearOperator{T}
     A :: aType
     DiffEqLinearOperator(A::aType; update_func=DEFAULT_UPDATE_FUNC,
@@ -69,7 +67,7 @@ struct ConstrainedODEFunction{iip,static,F1,F2,TMM,C,Ta,Tt,TJ,JVP,VJP,JP,SP,TW,T
     param_update_func :: PF
 end
 
-function ConstrainedODEFunction(r1,r2,B1,B2,A=I; param_update_fcn = DEFAULT_UPDATE_FUNC,
+function ConstrainedODEFunction(r1,r2,B1,B2,A=I; param_update_func = DEFAULT_UPDATE_FUNC,
                                                  mass_matrix=I,_func_cache=nothing,
                                                  analytic=nothing,
                                                  tgrad = nothing,
@@ -102,16 +100,16 @@ function ConstrainedODEFunction(r1,r2,B1,B2,A=I; param_update_fcn = DEFAULT_UPDA
     odef = SplitFunction(A, odef_nl ;_func_cache=deepcopy(_func_cache))
     conf = SplitFunction(r2ext,B2ext_rhs;_func_cache=deepcopy(_func_cache))
 
-    static = param_update_fcn == DEFAULT_UPDATE_FUNC ? true : false
+    static = param_update_func == DEFAULT_UPDATE_FUNC ? true : false
 
     ConstrainedODEFunction{isinplace(odef),static,typeof(odef),
                            typeof(conf),typeof(mass_matrix),typeof(_func_cache),
                            typeof(analytic),typeof(tgrad),typeof(jac),typeof(jvp),typeof(vjp),
                            typeof(jac_prototype),typeof(sparsity),
                            typeof(Wfact),typeof(Wfact_t),typeof(paramjac),typeof(syms),
-                           typeof(colorvec),typeof(param_update_fcn)}(odef,conf,mass_matrix,_func_cache,
+                           typeof(colorvec),typeof(param_update_func)}(odef,conf,mass_matrix,_func_cache,
                            analytic,tgrad,jac,jvp,vjp,jac_prototype,
-                           sparsity,Wfact,Wfact_t,paramjac,syms,colorvec,param_update_fcn)
+                           sparsity,Wfact,Wfact_t,paramjac,syms,colorvec,param_update_func)
 end
 
 @inline _ode_A!(du,f::ConstrainedODEFunction,u,p,t) = f.odef.f1(du,u,p,t) # A

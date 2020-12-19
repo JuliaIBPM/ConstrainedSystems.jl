@@ -13,7 +13,7 @@ for (Alg,Order) in [(:WrayHERK,3),(:BraseyHairerHERK,3),(:LiskaIFHERK,2),(:IFHEE
     @eval struct $Alg{sc,solverType} <: ConstrainedOrdinaryDiffEqAlgorithm{sc}
     end
 
-    @eval $Alg(;static_constraints=true,saddlesolver=ViscousFlow.ConstrainedSystems.Direct) = $Alg{static_constraints,saddlesolver}()
+    @eval $Alg(;static_constraints=true,saddlesolver=Direct) = $Alg{static_constraints,saddlesolver}()
 
     @eval export $Alg
 
@@ -92,7 +92,7 @@ function alg_cache(alg::LiskaIFHERK{sc,solverType},u,rate_prototype,uEltypeNoUni
   S = [S1]
   push!(S,saddle_system(Hzero,f,p,p,dutmp,solverType))
 
-  LiskaIFHERKCache{sc,solverType}(u,uprev,k1,k2,k3,utmp,dutmp,fsalfirst,Hhalfdt,Hzero,S,[p],k,tab)
+  LiskaIFHERKCache{sc,solverType}(u,uprev,k1,k2,k3,utmp,dutmp,fsalfirst,Hhalfdt,Hzero,S,p,k,tab)
 end
 
 function alg_cache(alg::LiskaIFHERK,u,rate_prototype,uEltypeNoUnits,uBottomEltypeNoUnits,tTypeNoUnits,uprev,uprev2,f,t,dt,reltol,p,calck,::Val{false})
@@ -101,8 +101,8 @@ end
 
 function saddle_system(A,f,p,pold,ducache,solver)
     nully, nullz = state(ducache), constraint(ducache)
-    B₁ᵀ(z) = (ducache .= 0.0; nully .= 0; -_ode_neg_B1!(ducache,f,ArrayPartition(nully,z),pold,0.0))
-    B₂(y) = (ducache .= 0.0; nullz .= 0; -_constraint_neg_B2!(ducache,f,ArrayPartition(y,nullz),p,0.0))
+    B₁ᵀ(z) = (fill!(ducache,0.0); fill!(nully,0.0); -_ode_neg_B1!(ducache,f,ArrayPartition(nully,z),pold,0.0))
+    B₂(y) = (fill!(ducache,0.0); fill!(nullz,0.0); -_constraint_neg_B2!(ducache,f,ArrayPartition(y,nullz),p,0.0))
     SaddleSystem(A,B₂,B₁ᵀ,ducache,solver=solver)
 end
 
@@ -142,9 +142,9 @@ end
     @.. utmp = uprev + k1
 
     # if applicable, update p, construct new saddle system here, using Hhalfdt
-    pold[1] = p
-    param_update_func(p,utmp,pold[1],ttmp)
-    saddle_system!(S[1],Hhalfdt,f,p,pold[1],dutmp,solverType,Val(sc))
+    recursivecopy!(pold,p)
+    param_update_func(p,utmp,pold,ttmp)
+    saddle_system!(S[1],Hhalfdt,f,p,pold,dutmp,solverType,Val(sc))
 
     _constraint_r2!(utmp,f,u,p,ttmp) # this should only update the z part
     u .= S[1]\utmp
@@ -163,9 +163,9 @@ end
     @.. utmp = uprev + k2 + dt*ã21*k1
 
     # if applicable, update p, construct new saddle system here, using Hhalfdt
-    pold[1] = p
-    param_update_func(p,utmp,pold[1],ttmp)
-    saddle_system!(S[1],Hhalfdt,f,p,pold[1],dutmp,solverType,Val(sc))
+    recursivecopy!(pold,p)
+    param_update_func(p,utmp,pold,ttmp)
+    saddle_system!(S[1],Hhalfdt,f,p,pold,dutmp,solverType,Val(sc))
 
     _constraint_r2!(utmp,f,u,p,ttmp)
     u .= S[1]\utmp
@@ -183,9 +183,9 @@ end
     @.. utmp = uprev + k3 + dt*ã32*k2 + dt*ã31*k1
 
     # if applicable, update p, construct new saddle system here, using Hzero (identity)
-    pold[1] = p
-    param_update_func(p,utmp,pold[1],ttmp)
-    saddle_system!(S[2],Hzero,f,p,pold[1],dutmp,solverType,Val(sc))
+    recursivecopy!(pold,p)
+    param_update_func(p,utmp,pold,ttmp)
+    saddle_system!(S[2],Hzero,f,p,pold,dutmp,solverType,Val(sc))
 
     _constraint_r2!(utmp,f,u,p,ttmp)
     u .= S[2]\utmp
