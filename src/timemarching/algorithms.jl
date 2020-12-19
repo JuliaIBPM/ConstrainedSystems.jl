@@ -36,6 +36,7 @@ end
   Hhalfdt::expType1
   Hzero::expType2
   S::saddleType
+  pnew::pType
   pold::pType
   k::rateType
   tab::TabType
@@ -67,13 +68,14 @@ struct LiskaIFHERKConstantCache{T,T2} <: OrdinaryDiffEqConstantCache
 end
 
 LiskaIFHERKCache{sc,solverType}(u,uprev,k1,k2,k3,utmp,dutmp,fsalfirst,
-                                Hhalfdt,Hzero,S,p,k,tab) where {sc,solverType} =
+                                Hhalfdt,Hzero,S,pnew,pold,k,tab) where {sc,solverType} =
         LiskaIFHERKCache{sc,solverType,typeof(u),typeof(k1),typeof(Hhalfdt),typeof(Hzero),
-                        typeof(S),typeof(p),typeof(tab)}(u,uprev,k1,k2,k3,utmp,dutmp,fsalfirst,
-                                                          Hhalfdt,Hzero,S,p,k,tab)
+                        typeof(S),typeof(pnew),typeof(tab)}(u,uprev,k1,k2,k3,utmp,dutmp,fsalfirst,
+                                                          Hhalfdt,Hzero,S,pnew,pold,k,tab)
 
 
-function alg_cache(alg::LiskaIFHERK{sc,solverType},u,rate_prototype,uEltypeNoUnits,uBottomEltypeNoUnits,tTypeNoUnits,uprev,uprev2,f,t,dt,reltol,p,calck,::Val{true}) where {sc,solverType}
+function alg_cache(alg::LiskaIFHERK{sc,solverType},u,rate_prototype,uEltypeNoUnits,uBottomEltypeNoUnits,
+                   tTypeNoUnits,uprev,uprev2,f,t,dt,reltol,p,calck,::Val{true}) where {sc,solverType}
 
   typeof(u) <: ArrayPartition || error("u must be of type ArrayPartition")
 
@@ -92,7 +94,7 @@ function alg_cache(alg::LiskaIFHERK{sc,solverType},u,rate_prototype,uEltypeNoUni
   S = [S1]
   push!(S,saddle_system(Hzero,f,p,p,dutmp,solverType))
 
-  LiskaIFHERKCache{sc,solverType}(u,uprev,k1,k2,k3,utmp,dutmp,fsalfirst,Hhalfdt,Hzero,S,p,k,tab)
+  LiskaIFHERKCache{sc,solverType}(u,uprev,k1,k2,k3,utmp,dutmp,fsalfirst,Hhalfdt,Hzero,S,deepcopy(p),deepcopy(p),k,tab)
 end
 
 function alg_cache(alg::LiskaIFHERK,u,rate_prototype,uEltypeNoUnits,uBottomEltypeNoUnits,tTypeNoUnits,uprev,uprev2,f,t,dt,reltol,p,calck,::Val{false})
@@ -106,6 +108,9 @@ function saddle_system(A,f,p,pold,ducache,solver)
     SaddleSystem(A,B₂,B₁ᵀ,ducache,solver=solver)
 end
 
+@inline saddle_system(Sold::SaddleSystem,A,f,p,pold,ducache,solver,::Val{false}) = saddle_system(A,f,p,pold,ducache,solver)
+@inline saddle_system(Sold::SaddleSystem,A,f,p,pold,ducache,solver,::Val{true}) = Sold
+
 @inline saddle_system!(S::SaddleSystem,A,f,p,pold,ducache,solver,::Val{false}) = (S = saddle_system(A,f,p,pold,ducache,solver); nothing)
 @inline saddle_system!(S::SaddleSystem,A,f,p,pold,ducache,solver,::Val{true}) = nothing
 
@@ -114,19 +119,23 @@ function initialize!(integrator,cache::LiskaIFHERKCache)
 
     integrator.fsalfirst = fsalfirst
     integrator.fsallast = k
-    integrator.kshortsize = 1
+    integrator.kshortsize = 2
     resize!(integrator.k, integrator.kshortsize)
     integrator.k[1] = integrator.fsalfirst
+    integrator.k[2] = integrator.fsallast
     integrator.f.odef(integrator.fsalfirst, integrator.uprev, integrator.p, integrator.t) # Pre-start fsal
+    integrator.f.param_update_func(integrator.p,integrator.uprev,integrator.p,integrator.t)
     integrator.destats.nf += 1
 
 end
 
 @muladd function perform_step!(integrator,cache::LiskaIFHERKCache{sc,solverType},repeat_step=false) where {sc,solverType}
     @unpack t,dt,uprev,u,f,p = integrator
-    @unpack k1,k2,k3,utmp,dutmp,fsalfirst,Hhalfdt,Hzero,S,pold,k = cache
+    @unpack k1,k2,k3,utmp,dutmp,fsalfirst,Hhalfdt,Hzero,S,pnew,pold,k = cache
     @unpack ã11,ã21,ã22,ã31,ã32,ã33,c̃1,c̃2,c̃3 = cache.tab
     @unpack param_update_func = f
+
+    recursivecopy!(pnew,p)
 
     # aliases to the state and constraint parts
     ytmp, ztmp = state(utmp), constraint(utmp)
@@ -136,63 +145,67 @@ end
     ttmp = t
     u .= uprev
 
-    _ode_r1!(k1,f,u,p,ttmp)  # should be able to replace this with fsalfirst
+    _ode_r1!(k1,f,u,pnew,ttmp)  # should be able to replace this with fsalfirst
     integrator.destats.nf += 1
     @.. k1 *= dt*ã11
     @.. utmp = uprev + k1
 
     # if applicable, update p, construct new saddle system here, using Hhalfdt
-    recursivecopy!(pold,p)
-    param_update_func(p,utmp,pold,ttmp)
-    saddle_system!(S[1],Hhalfdt,f,p,pold,dutmp,solverType,Val(sc))
+    recursivecopy!(pold,pnew)
+    param_update_func(pnew,u,pold,ttmp)
+    S[1] = saddle_system(S[1],Hhalfdt,f,pnew,pnew,dutmp,solverType,Val(sc))
 
-    _constraint_r2!(utmp,f,u,p,ttmp) # this should only update the z part
+    ttmp = t + dt*c̃1
+    _constraint_r2!(utmp,f,u,pnew,ttmp) # this should only update the z part
     u .= S[1]\utmp
 
     ytmp .= typeof(ytmp)(S[1].A⁻¹B₁ᵀf)
-    ttmp = t + dt*c̃1
 
     ldiv!(yprev,Hhalfdt,yprev)
     ldiv!(k1.x[1],Hhalfdt,k1.x[1])
 
+
     @.. k1 = (k1-utmp)/(dt*ã11)
 
-    _ode_r1!(k2,f,u,p,ttmp)
+    _ode_r1!(k2,f,u,pnew,ttmp)
     integrator.destats.nf += 1
     @.. k2 *= dt*ã22
     @.. utmp = uprev + k2 + dt*ã21*k1
 
     # if applicable, update p, construct new saddle system here, using Hhalfdt
-    recursivecopy!(pold,p)
-    param_update_func(p,utmp,pold,ttmp)
-    saddle_system!(S[1],Hhalfdt,f,p,pold,dutmp,solverType,Val(sc))
+    recursivecopy!(pold,pnew)
+    param_update_func(pnew,u,pold,ttmp)
+    S[1] = saddle_system(S[1],Hhalfdt,f,pnew,pnew,dutmp,solverType,Val(sc))
 
-    _constraint_r2!(utmp,f,u,p,ttmp)
+    ttmp = t + dt*c̃2
+    _constraint_r2!(utmp,f,u,pnew,ttmp)
     u .= S[1]\utmp
     ytmp .= typeof(ytmp)(S[1].A⁻¹B₁ᵀf)
-    ttmp = t + dt*c̃2
 
     ldiv!(yprev,Hhalfdt,yprev)
     ldiv!(k1.x[1],Hhalfdt,k1.x[1])
     ldiv!(k2.x[1],Hhalfdt,k2.x[1])
 
     @.. k2 = (k2-utmp)/(dt*ã22)
-    _ode_r1!(k3,f,u,p,ttmp)
+    _ode_r1!(k3,f,u,pnew,ttmp)
     integrator.destats.nf += 1
     @.. k3 *= dt*ã33
     @.. utmp = uprev + k3 + dt*ã32*k2 + dt*ã31*k1
 
     # if applicable, update p, construct new saddle system here, using Hzero (identity)
-    recursivecopy!(pold,p)
-    param_update_func(p,utmp,pold,ttmp)
-    saddle_system!(S[2],Hzero,f,p,pold,dutmp,solverType,Val(sc))
+    recursivecopy!(pold,pnew)
+    param_update_func(pnew,u,pold,ttmp)
+    S[2] = saddle_system(S[2],Hzero,f,pnew,pnew,dutmp,solverType,Val(sc))
 
-    _constraint_r2!(utmp,f,u,p,ttmp)
+    _constraint_r2!(utmp,f,u,pnew,t+dt)
     u .= S[2]\utmp
 
     @.. z /= dt*ã33
 
-    f.odef(k, u, p, t+dt)
+    param_update_func(pnew,u,p,t)
+    f.odef(integrator.fsallast, u, pnew, t+dt)
+
+    recursivecopy!(p,pnew)
 
     integrator.destats.nf += 1
     return nothing

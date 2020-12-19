@@ -27,7 +27,8 @@ function recursivecopy!(dest :: T, src :: T) where {T}
     fields = fieldnames(T)
     for f in fields
         tmp = getfield(dest,f)
-        copy!(tmp,getfield(src,f))
+        #tmp .= getfield(src,f)
+        copyto!(tmp,getfield(src,f))
     end
     dest
 end

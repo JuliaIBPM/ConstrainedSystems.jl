@@ -96,6 +96,7 @@ function ConstrainedODEFunction(r1,r2,B1,B2,A=I; param_update_func = DEFAULT_UPD
         error("Inconsistent function signatures")
     end
 
+    fill!(_func_cache,0.0)
     odef_nl = SplitFunction(r1ext,B1ext_rhs;_func_cache=deepcopy(_func_cache))
     odef = SplitFunction(A, odef_nl ;_func_cache=deepcopy(_func_cache))
     conf = SplitFunction(r2ext,B2ext_rhs;_func_cache=deepcopy(_func_cache))
@@ -121,6 +122,7 @@ end
 
 
 function (f::ConstrainedODEFunction)(du,u,p,t)
+    fill!(f.cache,0.0)
     f.odef(f.cache,u,p,t)
     f.conf(du,u,p,t)
     du .+= f.cache
