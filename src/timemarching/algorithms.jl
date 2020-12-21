@@ -22,9 +22,13 @@ end
 
 ### Caches ###
 
+abstract type ConstrainedODEMutableCache{sc,solverType} <: OrdinaryDiffEqMutableCache end
+abstract type ConstrainedODEConstantCache{sc,solverType} <: OrdinaryDiffEqConstantCache end
+
+
 # LiskaIFHERK
 
-@cache struct LiskaIFHERKCache{sc,solverType,uType,rateType,expType1,expType2,saddleType,pType,TabType} <: OrdinaryDiffEqMutableCache
+@cache struct LiskaIFHERKCache{sc,solverType,uType,rateType,expType1,expType2,saddleType,pType,TabType} <: ConstrainedODEMutableCache{sc,solverType}
   u::uType
   uprev::uType # qi
   k1::rateType # w1
@@ -42,7 +46,7 @@ end
   tab::TabType
 end
 
-struct LiskaIFHERKConstantCache{T,T2} <: OrdinaryDiffEqConstantCache
+struct LiskaIFHERKConstantCache{sc,solverType,T,T2} <: ConstrainedODEConstantCache{sc,solverType}
   ã11::T
   ã21::T
   ã22::T
@@ -53,7 +57,7 @@ struct LiskaIFHERKConstantCache{T,T2} <: OrdinaryDiffEqConstantCache
   c̃2::T2
   c̃3::T2
 
-  function LiskaIFHERKConstantCache(T, T2)
+  function LiskaIFHERKConstantCache{sc,solverType}(T, T2) where {sc,solverType}
     ã11 = T(1//2)
     ã21 = T(√3/3)
     ã22 = T((3-√3)/3)
@@ -63,7 +67,7 @@ struct LiskaIFHERKConstantCache{T,T2} <: OrdinaryDiffEqConstantCache
     c̃1 = T2(1//2)
     c̃2 = T2(1.0)
     c̃3 = T2(1.0)
-    new{T,T2}(ã11,ã21,ã22,ã31,ã32,ã33,c̃1,c̃2,c̃3)
+    new{sc,solverType,T,T2}(ã11,ã21,ã22,ã31,ã32,ã33,c̃1,c̃2,c̃3)
   end
 end
 
@@ -72,7 +76,6 @@ LiskaIFHERKCache{sc,solverType}(u,uprev,k1,k2,k3,utmp,dutmp,fsalfirst,
         LiskaIFHERKCache{sc,solverType,typeof(u),typeof(k1),typeof(Hhalfdt),typeof(Hzero),
                         typeof(S),typeof(pnew),typeof(tab)}(u,uprev,k1,k2,k3,utmp,dutmp,fsalfirst,
                                                           Hhalfdt,Hzero,S,pnew,pold,k,tab)
-
 
 function alg_cache(alg::LiskaIFHERK{sc,solverType},u,rate_prototype,uEltypeNoUnits,uBottomEltypeNoUnits,
                    tTypeNoUnits,uprev,uprev2,f,t,dt,reltol,p,calck,::Val{true}) where {sc,solverType}
@@ -84,7 +87,8 @@ function alg_cache(alg::LiskaIFHERK{sc,solverType},u,rate_prototype,uEltypeNoUni
   utmp = zero(u)
   k1, k2, k3, dutmp, fsalfirst, k = (zero(rate_prototype) for i in 1:6)
 
-  tab = LiskaIFHERKConstantCache(constvalue(uBottomEltypeNoUnits), constvalue(tTypeNoUnits))
+  tab = LiskaIFHERKConstantCache{sc,solverType}(constvalue(uBottomEltypeNoUnits),
+                                                constvalue(tTypeNoUnits))
 
   A = f.odef.f1.f
   Hhalfdt = exp(A,-dt/2,y)
@@ -94,11 +98,16 @@ function alg_cache(alg::LiskaIFHERK{sc,solverType},u,rate_prototype,uEltypeNoUni
   push!(S,SaddleSystem(Hhalfdt,f,p,p,dutmp,solverType))
   push!(S,SaddleSystem(Hzero,f,p,p,dutmp,solverType))
 
-  LiskaIFHERKCache{sc,solverType}(u,uprev,k1,k2,k3,utmp,dutmp,fsalfirst,Hhalfdt,Hzero,S,deepcopy(p),deepcopy(p),k,tab)
+  LiskaIFHERKCache{sc,solverType}(u,uprev,k1,k2,k3,utmp,dutmp,fsalfirst,
+                                  Hhalfdt,Hzero,S,deepcopy(p),deepcopy(p),k,tab)
 end
 
-function alg_cache(alg::LiskaIFHERK,u,rate_prototype,uEltypeNoUnits,uBottomEltypeNoUnits,tTypeNoUnits,uprev,uprev2,f,t,dt,reltol,p,calck,::Val{false})
-  LiskaIFHERKConstantCache(constvalue(uBottomEltypeNoUnits), constvalue(tTypeNoUnits))
+function alg_cache(alg::LiskaIFHERK{sc,solverType},u,rate_prototype,
+                                  uEltypeNoUnits,uBottomEltypeNoUnits,
+                                  tTypeNoUnits,uprev,uprev2,f,t,dt,reltol,
+                                  p,calck,::Val{false}) where {sc,solverType}
+  LiskaIFHERKConstantCache{sc,solverType}(constvalue(uBottomEltypeNoUnits),
+                                          constvalue(tTypeNoUnits))
 end
 
 function SaddleSystem(A,f::ConstrainedODEFunction,p,pold,ducache,solver)
@@ -110,6 +119,10 @@ end
 
 @inline SaddleSystem(Sold::SaddleSystem,A,f::ConstrainedODEFunction,p,pold,ducache,solver,::Val{false}) = SaddleSystem(A,f,p,pold,ducache,solver)
 @inline SaddleSystem(Sold::SaddleSystem,A,f::ConstrainedODEFunction,p,pold,ducache,solver,::Val{true}) = Sold
+
+@inline SaddleSystem(Sold::SaddleSystem,A,f::ConstrainedODEFunction,p,pold,
+                      cache::ConstrainedODEMutableCache{sc,solverType}) where {sc,solverType} =
+          SaddleSystem(Sold,A,f,p,pold,cache.dutmp,solverType,Val(sc))
 
 function initialize!(integrator,cache::LiskaIFHERKCache)
     @unpack k,fsalfirst = cache
@@ -150,7 +163,7 @@ end
     # if applicable, update p, construct new saddle system here, using Hhalfdt
     recursivecopy!(pold,pnew)
     param_update_func(pnew,u,pold,ttmp)
-    S[1] = SaddleSystem(S[1],Hhalfdt,f,pnew,pnew,dutmp,solverType,Val(sc))
+    S[1] = SaddleSystem(S[1],Hhalfdt,f,pnew,pnew,cache)
 
     ttmp = t + dt*c̃1
     _constraint_r2!(utmp,f,u,pnew,ttmp) # this should only update the z part
@@ -172,7 +185,7 @@ end
     # if applicable, update p, construct new saddle system here, using Hhalfdt
     recursivecopy!(pold,pnew)
     param_update_func(pnew,u,pold,ttmp)
-    S[1] = SaddleSystem(S[1],Hhalfdt,f,pnew,pnew,dutmp,solverType,Val(sc))
+    S[1] = SaddleSystem(S[1],Hhalfdt,f,pnew,pnew,cache)
 
     ttmp = t + dt*c̃2
     _constraint_r2!(utmp,f,u,pnew,ttmp)
@@ -192,7 +205,7 @@ end
     # if applicable, update p, construct new saddle system here, using Hzero (identity)
     recursivecopy!(pold,pnew)
     param_update_func(pnew,u,pold,ttmp)
-    S[2] = SaddleSystem(S[2],Hzero,f,pnew,pnew,dutmp,solverType,Val(sc))
+    S[2] = SaddleSystem(S[2],Hzero,f,pnew,pnew,cache)
 
     _constraint_r2!(utmp,f,u,pnew,t+dt)
     u .= S[2]\utmp

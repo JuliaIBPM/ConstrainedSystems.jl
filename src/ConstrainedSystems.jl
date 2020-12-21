@@ -16,6 +16,7 @@ import OrdinaryDiffEq.DiffEqBase: AbstractDiffEqLinearOperator,
                                   DEFAULT_UPDATE_FUNC, has_exp,
                                   AbstractODEFunction, isinplace
 
+import RecursiveArrayTools: recursivecopy, recursivecopy!
 
 
 using LinearAlgebra

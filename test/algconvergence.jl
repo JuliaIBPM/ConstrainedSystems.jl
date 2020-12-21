@@ -22,7 +22,7 @@ du = deepcopy(u₀)
 params = [l,g]
 p₀ = PendulumParams(params,zeros(Float64,4,2),zeros(Float64,2,4))
 
-function ode_rhs!(dy::Vector{Float64},y::Vector{Float64},p,t)
+function pendulum_rhs!(dy::Vector{Float64},y::Vector{Float64},p,t)
     dy .= 0.0
     dy[1] = y[3]
     dy[2] = y[4]
@@ -30,14 +30,14 @@ function ode_rhs!(dy::Vector{Float64},y::Vector{Float64},p,t)
     return dy
 end
 
-constraint_rhs!(dz::Vector{Float64},p,t) = dz .= [0.0,p.params[1]^2]
+length_constraint_rhs!(dz::Vector{Float64},p,t) = dz .= [0.0,p.params[1]^2]
 
-function op_constraint_force!(dy::Vector{Float64},z::Vector{Float64},p)
+function length_constraint_force!(dy::Vector{Float64},z::Vector{Float64},p)
     @unpack B₁ᵀ = p
     dy .= B₁ᵀ*z
 end
 
-function constraint_op!(dz::Vector{Float64},y::Vector{Float64},p)
+function length_constraint_op!(dz::Vector{Float64},y::Vector{Float64},p)
     @unpack B₂ = p
     dz .= B₂*y
 end
@@ -59,7 +59,7 @@ end
 
 # Get superconverged solution from the basic
 # problem expressed in theta
-function fex(u,p,t)
+function pendulum_theta(u,p,t)
     du = similar(u)
     du[1] = u[2]
     du[2] = -p^2*sin(u[1])
@@ -69,14 +69,14 @@ function fex(u,p,t)
 u0 = [π/2,0.0]
 pex = 1.0  # squared frequency
 tspan = (0.0,10.0)
-probex = ODEProblem(fex,u0,tspan,pex)
+probex = ODEProblem(pendulum_theta,u0,tspan,pex)
 solex = solve(probex, Tsit5(), reltol=1e-16, abstol=1e-16);
 xexact(t) = sin(solex(t,idxs=1))
 yexact(t) = 1.0 - cos(solex(t,idxs=1))
 
 # Set up the problem
-f = ConstrainedODEFunction(ode_rhs!,constraint_rhs!,op_constraint_force!,
-                            constraint_op!,
+f = ConstrainedODEFunction(pendulum_rhs!,length_constraint_rhs!,length_constraint_force!,
+                            length_constraint_op!,
                             _func_cache=deepcopy(du),param_update_func=update_p!)
 tspan = (0.0,1.0)
 p = deepcopy(p₀)
