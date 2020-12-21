@@ -85,7 +85,7 @@ prob = ODEProblem(f,u₀,tspan,p)
 
 # For now, do this quick and dirty until we figure out how to separate
 # state from constraint in sol structure
-solutions = [solve(prob,LiskaIFHERK(static_constraints=false);dt=dts[i]) for i=1:length(dts)]
+solutions = [solve(prob,LiskaIFHERK();dt=dts[i]) for i=1:length(dts)]
 
 l2err = [sqrt(DiffEqDevTools.recursive_mean(map(x -> float(x).^2,_sol[1,:]-xexact.(_sol.t)))) for _sol in solutions]
 error = Dict(:l2 => l2err)

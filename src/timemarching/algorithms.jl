@@ -7,13 +7,13 @@
 # BraseyHairerHERK is scheme B in Liska and Colonius (JCP 2016)
 # LiskaIFHERK is scheme A in Liska and Colonius (JCP 2016)
 
-abstract type ConstrainedOrdinaryDiffEqAlgorithm{sc} <: OrdinaryDiffEq.OrdinaryDiffEqAlgorithm end
+abstract type ConstrainedOrdinaryDiffEqAlgorithm <: OrdinaryDiffEq.OrdinaryDiffEqAlgorithm end
 
 for (Alg,Order) in [(:WrayHERK,3),(:BraseyHairerHERK,3),(:LiskaIFHERK,2),(:IFHEEuler,1)]
-    @eval struct $Alg{sc,solverType} <: ConstrainedOrdinaryDiffEqAlgorithm{sc}
+    @eval struct $Alg{solverType} <: ConstrainedOrdinaryDiffEqAlgorithm
     end
 
-    @eval $Alg(;static_constraints=true,saddlesolver=Direct) = $Alg{static_constraints,saddlesolver}()
+    @eval $Alg(;saddlesolver=Direct) = $Alg{saddlesolver}()
 
     @eval export $Alg
 
@@ -77,8 +77,8 @@ LiskaIFHERKCache{sc,solverType}(u,uprev,k1,k2,k3,utmp,dutmp,fsalfirst,
                         typeof(S),typeof(pnew),typeof(tab)}(u,uprev,k1,k2,k3,utmp,dutmp,fsalfirst,
                                                           Hhalfdt,Hzero,S,pnew,pold,k,tab)
 
-function alg_cache(alg::LiskaIFHERK{sc,solverType},u,rate_prototype,uEltypeNoUnits,uBottomEltypeNoUnits,
-                   tTypeNoUnits,uprev,uprev2,f,t,dt,reltol,p,calck,::Val{true}) where {sc,solverType}
+function alg_cache(alg::LiskaIFHERK{solverType},u,rate_prototype,uEltypeNoUnits,uBottomEltypeNoUnits,
+                   tTypeNoUnits,uprev,uprev2,f,t,dt,reltol,p,calck,::Val{true}) where {solverType}
 
   typeof(u) <: ArrayPartition || error("u must be of type ArrayPartition")
 
@@ -86,6 +86,8 @@ function alg_cache(alg::LiskaIFHERK{sc,solverType},u,rate_prototype,uEltypeNoUni
 
   utmp = zero(u)
   k1, k2, k3, dutmp, fsalfirst, k = (zero(rate_prototype) for i in 1:6)
+
+  sc = isstatic(f)
 
   tab = LiskaIFHERKConstantCache{sc,solverType}(constvalue(uBottomEltypeNoUnits),
                                                 constvalue(tTypeNoUnits))
@@ -102,13 +104,15 @@ function alg_cache(alg::LiskaIFHERK{sc,solverType},u,rate_prototype,uEltypeNoUni
                                   Hhalfdt,Hzero,S,deepcopy(p),deepcopy(p),k,tab)
 end
 
-function alg_cache(alg::LiskaIFHERK{sc,solverType},u,rate_prototype,
+function alg_cache(alg::LiskaIFHERK{solverType},u,rate_prototype,
                                   uEltypeNoUnits,uBottomEltypeNoUnits,
                                   tTypeNoUnits,uprev,uprev2,f,t,dt,reltol,
-                                  p,calck,::Val{false}) where {sc,solverType}
-  LiskaIFHERKConstantCache{sc,solverType}(constvalue(uBottomEltypeNoUnits),
+                                  p,calck,::Val{false}) where {solverType}
+  LiskaIFHERKConstantCache{isstatic(f),solverType}(constvalue(uBottomEltypeNoUnits),
                                           constvalue(tTypeNoUnits))
 end
+
+@inline isstatic(f::ConstrainedODEFunction) = f.param_update_func == DEFAULT_UPDATE_FUNC ? true : false
 
 function SaddleSystem(A,f::ConstrainedODEFunction,p,pold,ducache,solver)
     nully, nullz = state(ducache), constraint(ducache)
