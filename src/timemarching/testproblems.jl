@@ -5,7 +5,7 @@ struct ProblemParams{P,BT1,BT2}
 end
 
 
-function basic_constrained_problem()
+function basic_constrained_problem(;tmax=1.0)
 
   U0 = 1.0
   g = 1.0
@@ -55,7 +55,7 @@ function basic_constrained_problem()
                               constraint_op!,_func_cache=deepcopy(du),
                                             param_update_func=update_p!)
 
-  tspan = (0.0,1.0)
+  tspan = (0.0,tmax)
   p = deepcopy(p₀)
   prob = ODEProblem(f,u₀,tspan,p)
 
@@ -66,7 +66,7 @@ function basic_constrained_problem()
 end
 
 
-function cartesian_pendulum_problem()
+function cartesian_pendulum_problem(;tmax=1.0)
 
   θ₀ = π/2
   l = 1.0
@@ -113,7 +113,7 @@ function cartesian_pendulum_problem()
   f = ConstrainedODEFunction(pendulum_rhs!,length_constraint_rhs!,length_constraint_force!,
                               length_constraint_op!,
                               _func_cache=deepcopy(du),param_update_func=update_p!)
-  tspan = (0.0,1.0)
+  tspan = (0.0,tmax)
   p = deepcopy(p₀)
   prob = ODEProblem(f,u₀,tspan,p)
 
