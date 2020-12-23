@@ -175,8 +175,8 @@ end
 
 function SaddleSystem(A,f::ConstrainedODEFunction,p,pold,ducache,solver)
     nully, nullz = state(ducache), constraint(ducache)
-    B₁ᵀ(z) = (fill!(ducache,0.0); fill!(nully,0.0); -_ode_neg_B1!(ducache,f,ArrayPartition(nully,z),pold,0.0))
-    B₂(y) = (fill!(ducache,0.0); fill!(nullz,0.0); -_constraint_neg_B2!(ducache,f,ArrayPartition(y,nullz),p,0.0))
+    @inline B₁ᵀ(z) = (fill!(ducache,0.0); fill!(nully,0.0); -_ode_neg_B1!(ducache,f,ArrayPartition(nully,z),pold,0.0))
+    @inline B₂(y) = (fill!(ducache,0.0); fill!(nullz,0.0); -_constraint_neg_B2!(ducache,f,ArrayPartition(y,nullz),p,0.0))
     SaddleSystem(A,B₂,B₁ᵀ,ducache,solver=solver)
 end
 
@@ -189,6 +189,8 @@ end
 @inline SaddleSystem(S::SaddleSystem,A,f::ConstrainedODEFunction,p,pold,
                       cache::ConstrainedODEMutableCache{sc,solverType}) where {sc,solverType} =
           SaddleSystem(S,A,f,p,pold,cache.dutmp,solverType,Val(sc))
+
+#######
 
 function initialize!(integrator,cache::LiskaIFHERKCache)
     @unpack k,fsalfirst = cache
