@@ -120,3 +120,5 @@ function (f::ConstrainedODEFunction)(du,u,p,t)
     f.conf(du,u,p,t)
     du .+= f.cache
 end
+
+@inline isstatic(f::ConstrainedODEFunction) = f.param_update_func == DEFAULT_UPDATE_FUNC ? true : false

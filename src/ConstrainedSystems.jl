@@ -72,6 +72,7 @@ include("saddlepoint/arithmetic.jl")
 include("timemarching/types.jl")
 include("timemarching/misc_utils.jl")
 include("timemarching/algorithms.jl")
+include("timemarching/testproblems.jl")
 
 
 end

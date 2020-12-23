@@ -112,7 +112,63 @@ function alg_cache(alg::LiskaIFHERK{solverType},u,rate_prototype,
                                           constvalue(tTypeNoUnits))
 end
 
-@inline isstatic(f::ConstrainedODEFunction) = f.param_update_func == DEFAULT_UPDATE_FUNC ? true : false
+
+# IFHEEuler
+
+@cache struct IFHEEulerCache{sc,solverType,uType,rateType,expType,saddleType,pType} <: ConstrainedODEMutableCache{sc,solverType}
+  u::uType
+  uprev::uType # qi
+  k1::rateType # w1
+  utmp::uType  # cache
+  dutmp::rateType # cache for rates
+  fsalfirst::rateType
+  Hdt::expType
+  S::saddleType
+  pnew::pType
+  pold::pType
+  k::rateType
+end
+
+struct IFHEEulerConstantCache{sc,solverType} <: ConstrainedODEConstantCache{sc,solverType}
+
+end
+
+IFHEEulerCache{sc,solverType}(u,uprev,k1,utmp,dutmp,fsalfirst,
+                                Hdt,S,pnew,pold,k) where {sc,solverType} =
+        IFHEEulerCache{sc,solverType,typeof(u),typeof(k1),typeof(Hdt),
+                        typeof(S),typeof(pnew)}(u,uprev,k1,utmp,dutmp,fsalfirst,
+                                                              Hdt,S,pnew,pold,k)
+
+function alg_cache(alg::IFHEEuler{solverType},u,rate_prototype,uEltypeNoUnits,uBottomEltypeNoUnits,
+                   tTypeNoUnits,uprev,uprev2,f,t,dt,reltol,p,calck,::Val{true}) where {solverType}
+
+  typeof(u) <: ArrayPartition || error("u must be of type ArrayPartition")
+
+  y, z = u.x[1], u.x[2]
+
+  utmp = zero(u)
+  k1, dutmp, fsalfirst, k = (zero(rate_prototype) for i in 1:4)
+
+  sc = isstatic(f)
+
+  A = f.odef.f1.f
+  Hdt = exp(A,-dt,y)
+
+  S = []
+  push!(S,SaddleSystem(Hdt,f,p,p,dutmp,solverType))
+
+  IFHEEulerCache{sc,solverType}(u,uprev,k1,utmp,dutmp,fsalfirst,
+                                  Hdt,S,deepcopy(p),deepcopy(p),k)
+end
+
+function alg_cache(alg::IFHEEuler{solverType},u,rate_prototype,
+                                  uEltypeNoUnits,uBottomEltypeNoUnits,
+                                  tTypeNoUnits,uprev,uprev2,f,t,dt,reltol,
+                                  p,calck,::Val{false}) where {solverType}
+  IFHEEulerCacheConstantCache{isstatic(f),solverType}()
+end
+
+###############
 
 function SaddleSystem(A,f::ConstrainedODEFunction,p,pold,ducache,solver)
     nully, nullz = state(ducache), constraint(ducache)
@@ -121,12 +177,15 @@ function SaddleSystem(A,f::ConstrainedODEFunction,p,pold,ducache,solver)
     SaddleSystem(A,B₂,B₁ᵀ,ducache,solver=solver)
 end
 
-@inline SaddleSystem(Sold::SaddleSystem,A,f::ConstrainedODEFunction,p,pold,ducache,solver,::Val{false}) = SaddleSystem(A,f,p,pold,ducache,solver)
-@inline SaddleSystem(Sold::SaddleSystem,A,f::ConstrainedODEFunction,p,pold,ducache,solver,::Val{true}) = Sold
+@inline SaddleSystem(S::SaddleSystem,A,f::ConstrainedODEFunction,p,pold,ducache,solver,
+                      ::Val{false}) = SaddleSystem(A,f,p,pold,ducache,solver)
 
-@inline SaddleSystem(Sold::SaddleSystem,A,f::ConstrainedODEFunction,p,pold,
+@inline SaddleSystem(S::SaddleSystem,A,f::ConstrainedODEFunction,p,pold,ducache,solver,
+                      ::Val{true}) = S
+
+@inline SaddleSystem(S::SaddleSystem,A,f::ConstrainedODEFunction,p,pold,
                       cache::ConstrainedODEMutableCache{sc,solverType}) where {sc,solverType} =
-          SaddleSystem(Sold,A,f,p,pold,cache.dutmp,solverType,Val(sc))
+          SaddleSystem(S,A,f,p,pold,cache.dutmp,solverType,Val(sc))
 
 function initialize!(integrator,cache::LiskaIFHERKCache)
     @unpack k,fsalfirst = cache
@@ -159,17 +218,19 @@ end
     ttmp = t
     u .= uprev
 
-    _ode_r1!(k1,f,u,pnew,ttmp)  # should be able to replace this with fsalfirst
+    _ode_r1!(k1,f,u,pnew,ttmp)
     integrator.destats.nf += 1
     @.. k1 *= dt*ã11
     @.. utmp = uprev + k1
+    ttmp = t + dt*c̃1
 
     # if applicable, update p, construct new saddle system here, using Hhalfdt
     recursivecopy!(pold,pnew)
-    param_update_func(pnew,u,pold,ttmp)
-    S[1] = SaddleSystem(S[1],Hhalfdt,f,pnew,pnew,cache)
+    param_update_func(pnew,utmp,pold,ttmp)
+    #S[1] = SaddleSystem(S[1],Hhalfdt,f,pnew,pold,cache)
+    S[1] = SaddleSystem(S[1],Hhalfdt,f,pnew,pnew,cache) # no difference in accuracy
+    u .= utmp
 
-    ttmp = t + dt*c̃1
     _constraint_r2!(utmp,f,u,pnew,ttmp) # this should only update the z part
     u .= S[1]\utmp
 
@@ -178,20 +239,21 @@ end
     ldiv!(yprev,Hhalfdt,yprev)
     ldiv!(k1.x[1],Hhalfdt,k1.x[1])
 
-
     @.. k1 = (k1-utmp)/(dt*ã11)
 
     _ode_r1!(k2,f,u,pnew,ttmp)
     integrator.destats.nf += 1
     @.. k2 *= dt*ã22
     @.. utmp = uprev + k2 + dt*ã21*k1
+    ttmp = t + dt*c̃2
 
     # if applicable, update p, construct new saddle system here, using Hhalfdt
     recursivecopy!(pold,pnew)
-    param_update_func(pnew,u,pold,ttmp)
-    S[1] = SaddleSystem(S[1],Hhalfdt,f,pnew,pnew,cache)
+    param_update_func(pnew,utmp,pold,ttmp)
+    #S[1] = SaddleSystem(S[1],Hhalfdt,f,pnew,pold,cache)
+    S[1] = SaddleSystem(S[1],Hhalfdt,f,pnew,pnew,cache) # no difference in accuracy
+    u .= utmp
 
-    ttmp = t + dt*c̃2
     _constraint_r2!(utmp,f,u,pnew,ttmp)
     u .= S[1]\utmp
     ytmp .= typeof(ytmp)(S[1].A⁻¹B₁ᵀf)
@@ -205,16 +267,77 @@ end
     integrator.destats.nf += 1
     @.. k3 *= dt*ã33
     @.. utmp = uprev + k3 + dt*ã32*k2 + dt*ã31*k1
+    ttmp = t + dt
 
     # if applicable, update p, construct new saddle system here, using Hzero (identity)
     recursivecopy!(pold,pnew)
-    param_update_func(pnew,u,pold,ttmp)
-    S[2] = SaddleSystem(S[2],Hzero,f,pnew,pnew,cache)
+    param_update_func(pnew,utmp,pold,ttmp)
+    #S[2] = SaddleSystem(S[2],Hzero,f,pnew,pold,cache)
+    S[2] = SaddleSystem(S[2],Hzero,f,pnew,pnew,cache) # no difference in accuracy
+    u .= utmp
 
     _constraint_r2!(utmp,f,u,pnew,t+dt)
     u .= S[2]\utmp
 
     @.. z /= dt*ã33
+
+    param_update_func(pnew,u,p,t+dt)
+    f.odef(integrator.fsallast, u, pnew, t+dt)
+
+    recursivecopy!(p,pnew)
+
+    integrator.destats.nf += 1
+    return nothing
+end
+
+####
+
+function initialize!(integrator,cache::IFHEEulerCache)
+    @unpack k,fsalfirst = cache
+
+    integrator.fsalfirst = fsalfirst
+    integrator.fsallast = k
+    integrator.kshortsize = 2
+    resize!(integrator.k, integrator.kshortsize)
+    integrator.k[1] = integrator.fsalfirst
+    integrator.k[2] = integrator.fsallast
+    integrator.f.odef(integrator.fsalfirst, integrator.uprev, integrator.p, integrator.t) # Pre-start fsal
+    integrator.f.param_update_func(integrator.p,integrator.uprev,integrator.p,integrator.t)
+    integrator.destats.nf += 1
+
+end
+
+@muladd function perform_step!(integrator,cache::IFHEEulerCache{sc,solverType},repeat_step=false) where {sc,solverType}
+    @unpack t,dt,uprev,u,f,p = integrator
+    @unpack k1,utmp,dutmp,fsalfirst,Hdt,S,pnew,pold,k = cache
+    @unpack param_update_func = f
+
+    recursivecopy!(pnew,p)
+
+    # aliases to the state and constraint parts
+    ytmp, ztmp = state(utmp), constraint(utmp)
+    yprev = state(uprev)
+    z = constraint(u)
+
+    ttmp = t
+    u .= uprev
+
+    _ode_r1!(k1,f,u,pnew,ttmp)
+    integrator.destats.nf += 1
+    @.. k1 *= dt
+    @.. utmp = uprev + k1
+
+    # if applicable, update p, construct new saddle system here, using Hdt
+    recursivecopy!(pold,pnew)
+    param_update_func(pnew,u,pold,ttmp)
+    S[1] = SaddleSystem(S[1],Hdt,f,pnew,pnew,cache)
+
+    ttmp = t + dt
+    _constraint_r2!(utmp,f,u,pnew,ttmp) # this should only update the z part
+
+    u .= S[1]\utmp
+
+    @.. z /= dt
 
     param_update_func(pnew,u,p,t)
     f.odef(integrator.fsallast, u, pnew, t+dt)

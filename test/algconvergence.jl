@@ -1,97 +1,35 @@
 using DiffEqDevTools
+import DiffEqDevTools: recursive_mean
 import ConstrainedSystems: @unpack
 
-dts = 1 ./ 10 .^(1:4)
-testTol = 0.49
+dts = 1 ./ 2 .^(9:-1:5)
+testTol = 0.2
 
-struct PendulumParams{P,BT1,BT2}
-    params :: P
-    B₁ᵀ :: BT1
-    B₂ :: BT2
+@inline function compute_l2err(sol,t,sol_analytic)
+  sqrt(recursive_mean(map(x -> float(x).^2,sol-sol_analytic.(t))))
 end
 
-θ₀ = 0.0
-l = 1.0
-g = 1.0
-y₀ = Float64[l*cos(θ₀),l*sin(θ₀),0,0]
-z₀ = Float64[0.0, 0.0]
-
-u₀ = SaddleVector(y₀,z₀)
-du = deepcopy(u₀)
-
-params = [l,g]
-p₀ = PendulumParams(params,zeros(Float64,4,2),zeros(Float64,2,4))
-
-function pendulum_rhs!(dy::Vector{Float64},y::Vector{Float64},p,t)
-    dy .= 0.0
-    dy[1] = y[3]
-    dy[2] = y[4]
-    dy[4] = -p.params[2]
-    return dy
+function compute𝒪est(solutions,idx,sol_analytic)
+  l2err = [compute_l2err(_sol[idx,:],_sol.t,sol_analytic) for _sol in solutions]
+  error = Dict(:l2 => l2err)
+  𝒪est = Dict((DiffEqDevTools.calc𝒪estimates(p) for p = pairs(error)))
 end
-
-length_constraint_rhs!(dz::Vector{Float64},p,t) = dz .= [0.0,p.params[1]^2]
-
-function length_constraint_force!(dy::Vector{Float64},z::Vector{Float64},p)
-    @unpack B₁ᵀ = p
-    dy .= B₁ᵀ*z
-end
-
-function length_constraint_op!(dz::Vector{Float64},y::Vector{Float64},p)
-    @unpack B₂ = p
-    dz .= B₂*y
-end
-
-function update_p!(q,u,p,t)
-    y, z = state(u), constraint(u)
-    @unpack B₁ᵀ, B₂ = q
-    B₁ᵀ[3,1] = y[1]; B₁ᵀ[4,1] = y[2]; B₁ᵀ[1,2] = y[1]; B₁ᵀ[2,2] = y[2]
-    B₂[1,3] = y[1]; B₂[1,4] = y[2]; B₂[2,1] = y[1]; B₂[2,2] = y[2]
-    return q
-end
-
-
 
 
 @testset "Convergence test" begin
 
-# Pendulum problem in Cartesian coordinates.
-
-# Get superconverged solution from the basic
-# problem expressed in theta
-function pendulum_theta(u,p,t)
-    du = similar(u)
-    du[1] = u[2]
-    du[2] = -p^2*sin(u[1])
-    du
-  end
-
-u0 = [π/2,0.0]
-pex = 1.0  # squared frequency
-tspan = (0.0,10.0)
-probex = ODEProblem(pendulum_theta,u0,tspan,pex)
-solex = solve(probex, Tsit5(), reltol=1e-16, abstol=1e-16);
-xexact(t) = sin(solex(t,idxs=1))
-yexact(t) = 1.0 - cos(solex(t,idxs=1))
-
-# Set up the problem
-f = ConstrainedODEFunction(pendulum_rhs!,length_constraint_rhs!,length_constraint_force!,
-                            length_constraint_op!,
-                            _func_cache=deepcopy(du),param_update_func=update_p!)
-tspan = (0.0,1.0)
-p = deepcopy(p₀)
-prob = ODEProblem(f,u₀,tspan,p)
-
+prob, xexact, yexact = ConstrainedSystems.basic_constrained_problem()
 
 # For now, do this quick and dirty until we figure out how to separate
 # state from constraint in sol structure
-solutions = [solve(prob,LiskaIFHERK();dt=dts[i]) for i=1:length(dts)]
+solutions1 = [solve(prob,LiskaIFHERK();dt=dts[i]) for i=1:length(dts)]
+solutions2 = [solve(prob,IFHEEuler();dt=dts[i]) for i=1:length(dts)]
 
-l2err = [sqrt(DiffEqDevTools.recursive_mean(map(x -> float(x).^2,_sol[1,:]-xexact.(_sol.t)))) for _sol in solutions]
-error = Dict(:l2 => l2err)
+𝒪est1 = compute𝒪est(solutions1,1,xexact)
+𝒪est2 = compute𝒪est(solutions2,1,xexact)
 
-𝒪est = Dict((DiffEqDevTools.calc𝒪estimates(p) for p = pairs(error)))
+@test 𝒪est1[:l2][1] ≈ 2 atol=testTol
+@test 𝒪est2[:l2][1] ≈ 1 atol=testTol
 
- @test 𝒪est[:l2][1] ≈ 3 atol=testTol
 
 end
