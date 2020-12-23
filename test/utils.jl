@@ -1,14 +1,14 @@
-import ConstrainedSystems: recursivecopy!, _needs_iteration
+import ConstrainedSystems: recursivecopy!, needs_iteration
 
 @testset "Iteration test" begin
   Δt = 1e-2
   prob1, _, _ = ConstrainedSystems.basic_constrained_problem()
   integrator = ConstrainedSystems.init(prob1, LiskaIFHERK(),dt=Δt)
-  @test _needs_iteration(integrator,integrator.u) == false
+  @test needs_iteration(integrator.f,integrator.u,integrator.p,integrator.u) == false
 
   prob2, _, _ = ConstrainedSystems.cartesian_pendulum_problem()
   integrator = ConstrainedSystems.init(prob2, LiskaIFHERK(),dt=Δt)
-  @test _needs_iteration(integrator,integrator.u) == true
+  @test needs_iteration(integrator.f,integrator.u,integrator.p,integrator.u) == true
 
 end
 

@@ -30,7 +30,7 @@ abstract type ConstrainedODEConstantCache{sc,solverType} <: OrdinaryDiffEqConsta
 
 # LiskaIFHERK
 
-@cache struct LiskaIFHERKCache{sc,solverType,uType,rateType,expType1,expType2,saddleType,pType,TabType} <: ConstrainedODEMutableCache{sc,solverType}
+@cache struct LiskaIFHERKCache{sc,ni,solverType,uType,rateType,expType1,expType2,saddleType,pType,TabType} <: ConstrainedODEMutableCache{sc,solverType}
   u::uType
   uprev::uType # qi
   k1::rateType # w1
@@ -49,7 +49,7 @@ abstract type ConstrainedODEConstantCache{sc,solverType} <: OrdinaryDiffEqConsta
   tab::TabType
 end
 
-struct LiskaIFHERKConstantCache{sc,solverType,T,T2} <: ConstrainedODEConstantCache{sc,solverType}
+struct LiskaIFHERKConstantCache{sc,ni,solverType,T,T2} <: ConstrainedODEConstantCache{sc,solverType}
   ã11::T
   ã21::T
   ã22::T
@@ -60,7 +60,7 @@ struct LiskaIFHERKConstantCache{sc,solverType,T,T2} <: ConstrainedODEConstantCac
   c̃2::T2
   c̃3::T2
 
-  function LiskaIFHERKConstantCache{sc,solverType}(T, T2) where {sc,solverType}
+  function LiskaIFHERKConstantCache{sc,ni,solverType}(T, T2) where {sc,ni,solverType}
     ã11 = T(1//2)
     ã21 = T(√3/3)
     ã22 = T((3-√3)/3)
@@ -70,13 +70,13 @@ struct LiskaIFHERKConstantCache{sc,solverType,T,T2} <: ConstrainedODEConstantCac
     c̃1 = T2(1//2)
     c̃2 = T2(1.0)
     c̃3 = T2(1.0)
-    new{sc,solverType,T,T2}(ã11,ã21,ã22,ã31,ã32,ã33,c̃1,c̃2,c̃3)
+    new{sc,ni,solverType,T,T2}(ã11,ã21,ã22,ã31,ã32,ã33,c̃1,c̃2,c̃3)
   end
 end
 
-LiskaIFHERKCache{sc,solverType}(u,uprev,k1,k2,k3,utmp,udiff,dutmp,fsalfirst,
-                                Hhalfdt,Hzero,S,pnew,pold,k,tab) where {sc,solverType} =
-        LiskaIFHERKCache{sc,solverType,typeof(u),typeof(k1),typeof(Hhalfdt),typeof(Hzero),
+LiskaIFHERKCache{sc,ni,solverType}(u,uprev,k1,k2,k3,utmp,udiff,dutmp,fsalfirst,
+                                Hhalfdt,Hzero,S,pnew,pold,k,tab) where {sc,ni,solverType} =
+        LiskaIFHERKCache{sc,ni,solverType,typeof(u),typeof(k1),typeof(Hhalfdt),typeof(Hzero),
                         typeof(S),typeof(pnew),typeof(tab)}(u,uprev,k1,k2,k3,utmp,udiff,dutmp,fsalfirst,
                                                           Hhalfdt,Hzero,S,pnew,pold,k,tab)
 
@@ -85,14 +85,15 @@ function alg_cache(alg::LiskaIFHERK{solverType},u,rate_prototype,uEltypeNoUnits,
 
   typeof(u) <: ArrayPartition || error("u must be of type ArrayPartition")
 
-  y, z = u.x[1], u.x[2]
+  y, z = state(u), constraint(u)
 
   utmp, udiff = (zero(u) for i in 1:2)
   k1, k2, k3, dutmp, fsalfirst, k = (zero(rate_prototype) for i in 1:6)
 
   sc = isstatic(f)
+  ni = needs_iteration(f,u,p,rate_prototype)
 
-  tab = LiskaIFHERKConstantCache{sc,solverType}(constvalue(uBottomEltypeNoUnits),
+  tab = LiskaIFHERKConstantCache{sc,ni,solverType}(constvalue(uBottomEltypeNoUnits),
                                                 constvalue(tTypeNoUnits))
 
   A = f.odef.f1.f
@@ -103,7 +104,8 @@ function alg_cache(alg::LiskaIFHERK{solverType},u,rate_prototype,uEltypeNoUnits,
   push!(S,SaddleSystem(Hhalfdt,f,p,p,dutmp,solverType))
   push!(S,SaddleSystem(Hzero,f,p,p,dutmp,solverType))
 
-  LiskaIFHERKCache{sc,solverType}(u,uprev,k1,k2,k3,utmp,udiff,dutmp,fsalfirst,
+
+  LiskaIFHERKCache{sc,ni,solverType}(u,uprev,k1,k2,k3,utmp,udiff,dutmp,fsalfirst,
                                   Hhalfdt,Hzero,S,deepcopy(p),deepcopy(p),k,tab)
 end
 
@@ -111,7 +113,9 @@ function alg_cache(alg::LiskaIFHERK{solverType},u,rate_prototype,
                                   uEltypeNoUnits,uBottomEltypeNoUnits,
                                   tTypeNoUnits,uprev,uprev2,f,t,dt,reltol,
                                   p,calck,::Val{false}) where {solverType}
-  LiskaIFHERKConstantCache{isstatic(f),solverType}(constvalue(uBottomEltypeNoUnits),
+  LiskaIFHERKConstantCache{isstatic(f),
+                           needs_iteration(f,u,p,rate_prototype),
+                           solverType}(constvalue(uBottomEltypeNoUnits),
                                           constvalue(tTypeNoUnits))
 end
 
@@ -211,12 +215,15 @@ end
   sqrt(RecursiveArrayTools.recursive_mean(map(x -> float(x).^2,u)))
 end
 
-@muladd function perform_step!(integrator,cache::LiskaIFHERKCache{sc,solverType},repeat_step=false) where {sc,solverType}
+@muladd function perform_step!(integrator,cache::LiskaIFHERKCache{sc,ni,solverType},repeat_step=false) where {sc,ni,solverType}
     @unpack t,dt,uprev,u,f,p = integrator
     @unpack maxiter, tol = integrator.alg
     @unpack k1,k2,k3,utmp,udiff,dutmp,fsalfirst,Hhalfdt,Hzero,S,pnew,pold,k = cache
     @unpack ã11,ã21,ã22,ã31,ã32,ã33,c̃1,c̃2,c̃3 = cache.tab
     @unpack param_update_func = f
+
+    init_err = float(1)
+    init_iter = ni ? 1 : maxiter
 
     recursivecopy!(pnew,p)
 
@@ -238,7 +245,7 @@ end
     # and solve system. Solve iteratively if saddle operators depend on
     # constrained part of the state.
     recursivecopy!(pold,pnew)
-    err, numiter = 1.0, 1
+    err, numiter = init_err, init_iter
     u .= utmp # initial guess for iterations
     while err > tol && numiter <= maxiter
       udiff .= u
@@ -266,7 +273,7 @@ end
 
     # if applicable, update p, construct new saddle system here, using Hhalfdt
     recursivecopy!(pold,pnew)
-    err, numiter = 1.0, 1
+    err, numiter = init_err, init_iter
     u .= utmp
     while err > tol && numiter <= maxiter
       udiff .= u
@@ -294,7 +301,7 @@ end
 
     # if applicable, update p, construct new saddle system here, using Hzero (identity)
     recursivecopy!(pold,pnew)
-    err, numiter = 1.0, 1
+    err, numiter = init_err, init_iter
     u .= utmp
     while err > tol && numiter <= maxiter
       udiff .= u

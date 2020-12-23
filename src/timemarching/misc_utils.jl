@@ -45,8 +45,7 @@ end
 end
 
 # Seed the state vector with two sets of random values, apply the constraint operator on a
-function _needs_iteration(integrator,rate_prototype)
-    @unpack f, p, u = integrator
+function needs_iteration(f,u,p,rate_prototype)
 
     pseed = deepcopy(p)
     u_target, useed = (zero(u) for i in 1:2)
