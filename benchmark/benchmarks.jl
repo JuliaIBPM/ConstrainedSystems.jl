@@ -4,6 +4,8 @@ using BenchmarkTools, ConstrainedSystems
 prob1, xexact, yexact = ConstrainedSystems.basic_constrained_problem(tmax=3Δt)
 prob2, xexact, yexact = ConstrainedSystems.cartesian_pendulum_problem(tmax=3Δt)
 
+BenchmarkTools.DEFAULT_PARAMETERS.gcsample = true
+
 SUITE = BenchmarkGroup()
 SUITE["basic problem"] = BenchmarkGroup()
 SUITE["pendulum problem"] = BenchmarkGroup()
@@ -13,5 +15,4 @@ SUITE["basic problem"]["IFHEEuler"] = @benchmarkable solve(prob1, IFHEEuler(),dt
 SUITE["pendulum problem"]["LiskaIFHERK"] = @benchmarkable solve(prob2, LiskaIFHERK(),dt=Δt)
 SUITE["pendulum problem"]["IFHEEuler"] = @benchmarkable solve(prob2, IFHEEuler(),dt=Δt)
 
-#loadparams!(SUITE, BenchmarkTools.load("benchmark/bparams.json")[1], :evals, :samples)
-run(SUITE) #,verbose=true)
+run(SUITE)

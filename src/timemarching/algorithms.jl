@@ -11,9 +11,11 @@ abstract type ConstrainedOrdinaryDiffEqAlgorithm <: OrdinaryDiffEq.OrdinaryDiffE
 
 for (Alg,Order) in [(:WrayHERK,3),(:BraseyHairerHERK,3),(:LiskaIFHERK,2),(:IFHEEuler,1)]
     @eval struct $Alg{solverType} <: ConstrainedOrdinaryDiffEqAlgorithm
+      maxiter :: Int
+      tol :: Float64
     end
 
-    @eval $Alg(;saddlesolver=Direct) = $Alg{saddlesolver}()
+    @eval $Alg(;saddlesolver=Direct,maxiter=4,tol=eps(Float64)) = $Alg{saddlesolver}(maxiter,tol)
 
     @eval export $Alg
 
@@ -35,6 +37,7 @@ abstract type ConstrainedODEConstantCache{sc,solverType} <: OrdinaryDiffEqConsta
   k2::rateType # w2
   k3::rateType # w3
   utmp::uType  # cache
+  udiff::uType
   dutmp::rateType # cache for rates
   fsalfirst::rateType
   Hhalfdt::expType1
@@ -71,10 +74,10 @@ struct LiskaIFHERKConstantCache{sc,solverType,T,T2} <: ConstrainedODEConstantCac
   end
 end
 
-LiskaIFHERKCache{sc,solverType}(u,uprev,k1,k2,k3,utmp,dutmp,fsalfirst,
+LiskaIFHERKCache{sc,solverType}(u,uprev,k1,k2,k3,utmp,udiff,dutmp,fsalfirst,
                                 Hhalfdt,Hzero,S,pnew,pold,k,tab) where {sc,solverType} =
         LiskaIFHERKCache{sc,solverType,typeof(u),typeof(k1),typeof(Hhalfdt),typeof(Hzero),
-                        typeof(S),typeof(pnew),typeof(tab)}(u,uprev,k1,k2,k3,utmp,dutmp,fsalfirst,
+                        typeof(S),typeof(pnew),typeof(tab)}(u,uprev,k1,k2,k3,utmp,udiff,dutmp,fsalfirst,
                                                           Hhalfdt,Hzero,S,pnew,pold,k,tab)
 
 function alg_cache(alg::LiskaIFHERK{solverType},u,rate_prototype,uEltypeNoUnits,uBottomEltypeNoUnits,
@@ -84,7 +87,7 @@ function alg_cache(alg::LiskaIFHERK{solverType},u,rate_prototype,uEltypeNoUnits,
 
   y, z = u.x[1], u.x[2]
 
-  utmp = zero(u)
+  utmp, udiff = (zero(u) for i in 1:2)
   k1, k2, k3, dutmp, fsalfirst, k = (zero(rate_prototype) for i in 1:6)
 
   sc = isstatic(f)
@@ -100,7 +103,7 @@ function alg_cache(alg::LiskaIFHERK{solverType},u,rate_prototype,uEltypeNoUnits,
   push!(S,SaddleSystem(Hhalfdt,f,p,p,dutmp,solverType))
   push!(S,SaddleSystem(Hzero,f,p,p,dutmp,solverType))
 
-  LiskaIFHERKCache{sc,solverType}(u,uprev,k1,k2,k3,utmp,dutmp,fsalfirst,
+  LiskaIFHERKCache{sc,solverType}(u,uprev,k1,k2,k3,utmp,udiff,dutmp,fsalfirst,
                                   Hhalfdt,Hzero,S,deepcopy(p),deepcopy(p),k,tab)
 end
 
@@ -208,13 +211,12 @@ end
 
 @muladd function perform_step!(integrator,cache::LiskaIFHERKCache{sc,solverType},repeat_step=false) where {sc,solverType}
     @unpack t,dt,uprev,u,f,p = integrator
-    @unpack k1,k2,k3,utmp,dutmp,fsalfirst,Hhalfdt,Hzero,S,pnew,pold,k = cache
+    @unpack maxiter, tol = integrator.alg
+    @unpack k1,k2,k3,utmp,udiff,dutmp,fsalfirst,Hhalfdt,Hzero,S,pnew,pold,k = cache
     @unpack ã11,ã21,ã22,ã31,ã32,ã33,c̃1,c̃2,c̃3 = cache.tab
     @unpack param_update_func = f
 
     recursivecopy!(pnew,p)
-
-    utmp2 = deepcopy(u) #JDE
 
     # aliases to the state and constraint parts
     ytmp, ztmp = state(utmp), constraint(utmp)
@@ -234,20 +236,17 @@ end
     # and solve system. Solve iteratively if saddle operators depend on
     # state
     recursivecopy!(pold,pnew)
-    err = 1.0
-    numiter = 0
-    tol = eps(1.0)
-    maxiter = 4
+    err, numiter = 1.0, 0
     u .= utmp
     while err > tol && numiter < maxiter
       numiter += 1
-      utmp2 .= u
+      udiff .= u
       param_update_func(pnew,u,pold,ttmp)
       S[1] = SaddleSystem(S[1],Hhalfdt,f,pnew,pold,cache)
       _constraint_r2!(utmp,f,u,pnew,ttmp) # this should only update the z part
       u .= S[1]\utmp
-      @.. utmp2 -= u
-      err = compute_l2err(utmp2)
+      @.. udiff -= u
+      err = compute_l2err(udiff)
     end
 
     ytmp .= typeof(ytmp)(S[1].A⁻¹B₁ᵀf)
@@ -265,19 +264,18 @@ end
 
     # if applicable, update p, construct new saddle system here, using Hhalfdt
     recursivecopy!(pold,pnew)
-    err = 1.0
-    numiter = 0
+    err, numiter = 1.0, 0
     u .= utmp
     while err > tol && numiter < maxiter
       numiter += 1
-      utmp2 .= u
+      udiff .= u
       param_update_func(pnew,u,pold,ttmp)
       S[1] = SaddleSystem(S[1],Hhalfdt,f,pnew,pold,cache)
 
       _constraint_r2!(utmp,f,u,pnew,ttmp)
       u .= S[1]\utmp
-      @.. utmp2 -= u
-      err = compute_l2err(utmp2)
+      @.. udiff -= u
+      err = compute_l2err(udiff)
     end
     ytmp .= typeof(ytmp)(S[1].A⁻¹B₁ᵀf)
 
@@ -294,19 +292,18 @@ end
 
     # if applicable, update p, construct new saddle system here, using Hzero (identity)
     recursivecopy!(pold,pnew)
-    err = 1.0
-    numiter = 0
+    err, numiter = 1.0, 0
     u .= utmp
     while err > tol && numiter < maxiter
       numiter += 1
-      utmp2 .= u
+      udiff .= u
       param_update_func(pnew,u,pold,ttmp)
       S[2] = SaddleSystem(S[2],Hzero,f,pnew,pold,cache)
 
       _constraint_r2!(utmp,f,u,pnew,t+dt)
       u .= S[2]\utmp
-      @.. utmp2 -= u
-      err = compute_l2err(utmp2)
+      @.. udiff -= u
+      err = compute_l2err(udiff)
       #println("error = ",err)
     end
 
