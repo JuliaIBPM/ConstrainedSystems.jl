@@ -68,17 +68,17 @@ end
 
 function cartesian_pendulum_problem()
 
-  θ₀ = 0.0
+  θ₀ = π/2
   l = 1.0
   g = 1.0
-  y₀ = Float64[l*cos(θ₀),l*sin(θ₀),0,0]
+  y₀ = Float64[l*sin(θ₀),-l*cos(θ₀),0,0]
   z₀ = Float64[0.0, 0.0]
 
   u₀ = SaddleVector(y₀,z₀)
   du = deepcopy(u₀)
 
   params = [l,g]
-  p₀ = ProblemParams(params,zeros(Float64,4,2),zeros(Float64,2,4))
+  p₀ = ProblemParams(params,Array{Float64}(undef,4,2),Array{Float64}(undef,2,4))
 
   function pendulum_rhs!(dy::Vector{Float64},y::Vector{Float64},p,t)
     dy .= 0.0
@@ -103,6 +103,8 @@ function cartesian_pendulum_problem()
   function update_p!(q,u,p,t)
     y, z = state(u), constraint(u)
     @unpack B₁ᵀ, B₂ = q
+    fill!(B₁ᵀ,0.0)
+    fill!(B₂,0.0)
     B₁ᵀ[3,1] = y[1]; B₁ᵀ[4,1] = y[2]; B₁ᵀ[1,2] = y[1]; B₁ᵀ[2,2] = y[2]
     B₂[1,3] = y[1]; B₂[1,4] = y[2]; B₂[2,1] = y[1]; B₂[2,2] = y[2]
     return q
@@ -125,7 +127,7 @@ function cartesian_pendulum_problem()
   end
 
   u0 = [π/2,0.0]
-  pex = 1.0  # squared frequency
+  pex = g/l  # squared frequency
   tspan = (0.0,10.0)
   probex = ODEProblem(pendulum_theta,u0,tspan,pex)
   solex = solve(probex, Tsit5(), reltol=1e-16, abstol=1e-16);

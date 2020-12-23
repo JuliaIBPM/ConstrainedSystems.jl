@@ -202,6 +202,10 @@ function initialize!(integrator,cache::LiskaIFHERKCache)
 
 end
 
+@inline function compute_l2err(u)
+  sqrt(RecursiveArrayTools.recursive_mean(map(x -> float(x).^2,u)))
+end
+
 @muladd function perform_step!(integrator,cache::LiskaIFHERKCache{sc,solverType},repeat_step=false) where {sc,solverType}
     @unpack t,dt,uprev,u,f,p = integrator
     @unpack k1,k2,k3,utmp,dutmp,fsalfirst,Hhalfdt,Hzero,S,pnew,pold,k = cache
@@ -210,10 +214,12 @@ end
 
     recursivecopy!(pnew,p)
 
+    utmp2 = deepcopy(u) #JDE
+
     # aliases to the state and constraint parts
     ytmp, ztmp = state(utmp), constraint(utmp)
     yprev = state(uprev)
-    z = constraint(u)
+    y, z = state(u), constraint(u)
 
     ttmp = t
     u .= uprev
@@ -225,14 +231,24 @@ end
     ttmp = t + dt*c̃1
 
     # if applicable, update p, construct new saddle system here, using Hhalfdt
+    # and solve system. Solve iteratively if saddle operators depend on
+    # state
     recursivecopy!(pold,pnew)
-    param_update_func(pnew,utmp,pold,ttmp)
-    #S[1] = SaddleSystem(S[1],Hhalfdt,f,pnew,pold,cache)
-    S[1] = SaddleSystem(S[1],Hhalfdt,f,pnew,pnew,cache) # no difference in accuracy
+    err = 1.0
+    numiter = 0
+    tol = eps(1.0)
+    maxiter = 4
     u .= utmp
-
-    _constraint_r2!(utmp,f,u,pnew,ttmp) # this should only update the z part
-    u .= S[1]\utmp
+    while err > tol && numiter < maxiter
+      numiter += 1
+      utmp2 .= u
+      param_update_func(pnew,u,pold,ttmp)
+      S[1] = SaddleSystem(S[1],Hhalfdt,f,pnew,pold,cache)
+      _constraint_r2!(utmp,f,u,pnew,ttmp) # this should only update the z part
+      u .= S[1]\utmp
+      @.. utmp2 -= u
+      err = compute_l2err(utmp2)
+    end
 
     ytmp .= typeof(ytmp)(S[1].A⁻¹B₁ᵀf)
 
@@ -249,13 +265,20 @@ end
 
     # if applicable, update p, construct new saddle system here, using Hhalfdt
     recursivecopy!(pold,pnew)
-    param_update_func(pnew,utmp,pold,ttmp)
-    #S[1] = SaddleSystem(S[1],Hhalfdt,f,pnew,pold,cache)
-    S[1] = SaddleSystem(S[1],Hhalfdt,f,pnew,pnew,cache) # no difference in accuracy
+    err = 1.0
+    numiter = 0
     u .= utmp
+    while err > tol && numiter < maxiter
+      numiter += 1
+      utmp2 .= u
+      param_update_func(pnew,u,pold,ttmp)
+      S[1] = SaddleSystem(S[1],Hhalfdt,f,pnew,pold,cache)
 
-    _constraint_r2!(utmp,f,u,pnew,ttmp)
-    u .= S[1]\utmp
+      _constraint_r2!(utmp,f,u,pnew,ttmp)
+      u .= S[1]\utmp
+      @.. utmp2 -= u
+      err = compute_l2err(utmp2)
+    end
     ytmp .= typeof(ytmp)(S[1].A⁻¹B₁ᵀf)
 
     ldiv!(yprev,Hhalfdt,yprev)
@@ -271,17 +294,25 @@ end
 
     # if applicable, update p, construct new saddle system here, using Hzero (identity)
     recursivecopy!(pold,pnew)
-    param_update_func(pnew,utmp,pold,ttmp)
-    #S[2] = SaddleSystem(S[2],Hzero,f,pnew,pold,cache)
-    S[2] = SaddleSystem(S[2],Hzero,f,pnew,pnew,cache) # no difference in accuracy
+    err = 1.0
+    numiter = 0
     u .= utmp
+    while err > tol && numiter < maxiter
+      numiter += 1
+      utmp2 .= u
+      param_update_func(pnew,u,pold,ttmp)
+      S[2] = SaddleSystem(S[2],Hzero,f,pnew,pold,cache)
 
-    _constraint_r2!(utmp,f,u,pnew,t+dt)
-    u .= S[2]\utmp
+      _constraint_r2!(utmp,f,u,pnew,t+dt)
+      u .= S[2]\utmp
+      @.. utmp2 -= u
+      err = compute_l2err(utmp2)
+      #println("error = ",err)
+    end
 
-    @.. z /= dt*ã33
+    @.. z /= (dt*ã33)
 
-    param_update_func(pnew,u,p,t+dt)
+    param_update_func(pnew,u,pold,t+dt)
     f.odef(integrator.fsallast, u, pnew, t+dt)
 
     recursivecopy!(p,pnew)
@@ -326,13 +357,13 @@ end
     integrator.destats.nf += 1
     @.. k1 *= dt
     @.. utmp = uprev + k1
+    ttmp = t + dt
 
     # if applicable, update p, construct new saddle system here, using Hdt
     recursivecopy!(pold,pnew)
-    param_update_func(pnew,u,pold,ttmp)
-    S[1] = SaddleSystem(S[1],Hdt,f,pnew,pnew,cache)
+    param_update_func(pnew,utmp,pold,ttmp)
+    S[1] = SaddleSystem(S[1],Hdt,f,pnew,pold,cache)
 
-    ttmp = t + dt
     _constraint_r2!(utmp,f,u,pnew,ttmp) # this should only update the z part
 
     u .= S[1]\utmp
