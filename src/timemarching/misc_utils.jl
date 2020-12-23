@@ -39,3 +39,32 @@ function recursivecopy!(dest :: AbstractArray{T}, src :: AbstractArray{T}) where
     end
     return dest
 end
+
+@inline function _l2norm(u)
+  sqrt(recursive_mean(map(x -> float(x).^2,u)))
+end
+
+# Seed the state vector with two sets of random values, apply the constraint operator on a
+function _needs_iteration(integrator,rate_prototype)
+    @unpack f, p, u = integrator
+
+    pseed = deepcopy(p)
+    u_target, useed = (zero(u) for i in 1:2)
+    yseed = state(useed)
+    y_target = state(u_target)
+    fill!(y_target,1.0)
+
+    dutmp, dudiff = (zero(rate_prototype) for i in 1:2)
+    dzdiff = constraint(dudiff)
+
+    yseed .= randn(size(yseed))
+    f.param_update_func(pseed,useed,p,0.0)
+    _constraint_neg_B2!(dutmp,f,u_target,pseed,0.0)
+    dudiff .= dutmp
+
+    yseed .= randn(size(yseed))
+    f.param_update_func(pseed,useed,p,0.0)
+    _constraint_neg_B2!(dutmp,f,u_target,pseed,0.0)
+    dudiff .-= dutmp
+    !(_l2norm(dzdiff) == 0.0)
+end

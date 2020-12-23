@@ -236,18 +236,18 @@ end
 
     # if applicable, update p, construct new saddle system here, using Hhalfdt
     # and solve system. Solve iteratively if saddle operators depend on
-    # state
+    # constrained part of the state.
     recursivecopy!(pold,pnew)
-    err, numiter = 1.0, 0
-    u .= utmp
-    while err > tol && numiter < maxiter
-      numiter += 1
+    err, numiter = 1.0, 1
+    u .= utmp # initial guess for iterations
+    while err > tol && numiter <= maxiter
       udiff .= u
       param_update_func(pnew,u,pold,ttmp)
       S[1] = SaddleSystem(S[1],Hhalfdt,f,pnew,pold,cache)
       _constraint_r2!(utmp,f,u,pnew,ttmp) # this should only update the z part
       u .= S[1]\utmp
       @.. udiff -= u
+      numiter += 1
       err = compute_l2err(udiff)
     end
 
@@ -266,10 +266,9 @@ end
 
     # if applicable, update p, construct new saddle system here, using Hhalfdt
     recursivecopy!(pold,pnew)
-    err, numiter = 1.0, 0
+    err, numiter = 1.0, 1
     u .= utmp
-    while err > tol && numiter < maxiter
-      numiter += 1
+    while err > tol && numiter <= maxiter
       udiff .= u
       param_update_func(pnew,u,pold,ttmp)
       S[1] = SaddleSystem(S[1],Hhalfdt,f,pnew,pold,cache)
@@ -277,6 +276,7 @@ end
       _constraint_r2!(utmp,f,u,pnew,ttmp)
       u .= S[1]\utmp
       @.. udiff -= u
+      numiter += 1
       err = compute_l2err(udiff)
     end
     ytmp .= typeof(ytmp)(S[1].A⁻¹B₁ᵀf)
@@ -294,10 +294,9 @@ end
 
     # if applicable, update p, construct new saddle system here, using Hzero (identity)
     recursivecopy!(pold,pnew)
-    err, numiter = 1.0, 0
+    err, numiter = 1.0, 1
     u .= utmp
-    while err > tol && numiter < maxiter
-      numiter += 1
+    while err > tol && numiter <= maxiter
       udiff .= u
       param_update_func(pnew,u,pold,ttmp)
       S[2] = SaddleSystem(S[2],Hzero,f,pnew,pold,cache)
@@ -305,6 +304,7 @@ end
       _constraint_r2!(utmp,f,u,pnew,t+dt)
       u .= S[2]\utmp
       @.. udiff -= u
+      numiter += 1
       err = compute_l2err(udiff)
       #println("error = ",err)
     end

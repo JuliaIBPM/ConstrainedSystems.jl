@@ -1,13 +1,11 @@
 using DiffEqDevTools
 import DiffEqDevTools: recursive_mean
-import ConstrainedSystems: @unpack
+import ConstrainedSystems: @unpack, _l2norm
 
 dts = 1 ./ 2 .^(9:-1:5)
 testTol = 0.2
 
-@inline function compute_l2err(sol,t,sol_analytic)
-  sqrt(recursive_mean(map(x -> float(x).^2,sol-sol_analytic.(t))))
-end
+@inline compute_l2err(sol,t,sol_analytic) = _l2norm(sol-sol_analytic.(t))
 
 function compute𝒪est(solutions,idx,sol_analytic)
   l2err = [compute_l2err(_sol[idx,:],_sol.t,sol_analytic) for _sol in solutions]
