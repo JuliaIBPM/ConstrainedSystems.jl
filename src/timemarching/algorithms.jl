@@ -251,7 +251,7 @@ end
       udiff .= u
       param_update_func(pnew,u,pold,ttmp)
       S[1] = SaddleSystem(S[1],Hhalfdt,f,pnew,pold,cache)
-      _constraint_r2!(utmp,f,u,pnew,ttmp) # this should only update the z part
+      _constraint_r2!(utmp,f,u,pnew,ttmp) # only updates the z part
       u .= S[1]\utmp
       @.. udiff -= u
       numiter += 1

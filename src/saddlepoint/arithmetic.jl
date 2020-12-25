@@ -55,7 +55,15 @@ function mul!(sol,sys::NTuple{M,SaddleSystem},rhs) where {M}
    sol
 end
 
-function (*)(sys::NTuple{M,SaddleSystem},rhs) where {M}
+
+function mul!(sol,sys::ArrayPartition{T},rhs) where {T<:SaddleSystem}
+   for (i,sysi) in enumerate(sys.x)
+     mul!(sol.x[i],sysi,rhs.x[i])
+   end
+   sol
+end
+
+function (*)(sys::Union{NTuple{M,T},ArrayPartition{T}},rhs) where {M,T<:ArrayPartition}
     sol = deepcopy.(rhs)
     mul!(sol,sys,rhs)
     return sol
@@ -130,7 +138,14 @@ function ldiv!(sol,sys::NTuple{M,SaddleSystem},rhs) where {M}
    sol
 end
 
-function (\)(sys::NTuple{M,SaddleSystem},rhs) where {M}
+function ldiv!(sol,sys::ArrayPartition{T},rhs) where {M,T<:SaddleSystem}
+   for (i,sysi) in enumerate(sys.x)
+     ldiv!(sol.x[i],sysi,rhs.x[i])
+   end
+   sol
+end
+
+function (\)(sys::Union{NTuple{M,T},ArrayPartition{T}},rhs) where {M,T<:SaddleSystem}
     sol = deepcopy.(rhs)
     ldiv!(sol,sys,rhs)
     return sol

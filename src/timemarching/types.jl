@@ -1,4 +1,24 @@
-export DiffEqLinearOperator, ConstrainedODEFunction
+export DiffEqLinearOperator, ConstrainedODEFunction, solvector, mainvector, auxvector
+
+"""
+    solvector()
+
+Build a solution vector for a constrained system. This takes three optional keyword
+arguments: `state`, `constraint`, and `aux_state`.
+"""
+solvector(;state=nothing,constraint=nothing,aux_state=nothing) = _solvector(state,constraint,aux_state)
+_solvector(::Nothing,::Nothing,::Nothing) = nothing
+_solvector(state,::Nothing,::Nothing) = state
+_solvector(state,::Nothing,aux_state) = state
+_solvector(state,constraint,::Nothing) = ArrayPartition(state,constraint)
+_solvector(state,constraint,aux_state) = ArrayPartition(_solvector(state,constraint,nothing),aux_state)
+
+mainvector(u) = u
+mainvector(u::ArrayPartition{T,Tuple{A,F}}) where {T,A<:ArrayPartition,F} = u.x[1]
+
+auxvector(u) = Array{eltype(u)}(undef,0,0)
+auxvector(u::ArrayPartition{T,Tuple{A,F}}) where {T,A<:ArrayPartition,F} = u.x[2]
+
 
 #### Operator and function types ####
 
@@ -12,18 +32,46 @@ end
 
 import Base: exp
 exp(f::DiffEqLinearOperator,args...) = exp(f.L,args...)
+exp(f::ArrayPartition,t,x::ArrayPartition) =
+                ArrayPartition((exp(Li,t,xi) for (Li,xi) in zip(f.L.x,x.x))...)
+
+
 has_exp(::DiffEqLinearOperator) = true
 
 exp(L::AbstractMatrix,t,x) = exp(factorize(L)*t)
 exp(L::UniformScaling,t,x) = exp(Diagonal(L,length(x))*t)
 
+#=
+A function of this type should be able to take arguments (du,u,p,t) (for in-place)
+or (u,p,t) for out-of-place, and distribute the parts of u and du as
+needed to the component functions. u and du will both be of type ArrayPartition,
+with two parts: state(u) and constraint(u).
+
+In some cases we wish to solve a separate (unconstrained) system, e.g., to
+update the constraint operators B1 and B2. This update is done via the
+parameters, using param_update_func. In this case, u and du are ArrayPartition
+with the first part corresponding to the constrained system (and of ArrayPartition type)
+and the second part is for the unconstrained system. We supply `r1` as
+an ArrayPartition of the component functions (in the same order). The arguments of
+each component function of `r1` should only take in and return their own parts
+of this state.
+
+In the future we can expand this to take in multiple (coupled) systems of this form,
+as in FSI problems. In these cases, the component functions should be supplied as
+ArrayPartition's of the functions for each system. Each of the component functions of each system
+should be able to take in the *full* state and/or constraint and return the
+*full* state/constraint, as appropriate, in order to enable coupling of the
+systems.
+=#
+
+
 """
-        ConstrainedODEFunction(r1,r2,B1,B2[,L=zeros])
+        ConstrainedODEFunction(r1,r2,B1,B2[,L])
 
 This specifies the functions and operators that comprise an ODE problem with the form
 
 ``
-\\dfrac{dy}{dt} = Ly - B_1 z + r_1(y,t)
+M\\dfrac{dy}{dt} = Ly - B_1 z + r_1(y,t)
 ``
 
 ``
@@ -35,9 +83,11 @@ in-place forms `B1(dy,z,p)` (to compute the action of `B1` on `z`) and `B2(dz,y,
 of `B2` on `y`). The function `r1` must of the in-place form `r1(dy,y,p,t)`, and `r2` must be in the in-place form
 `r2(dz,p,t)`.
 
-An optional argument `param_update_func` can be used to set a function that updates problem parameters with
+The optional keyword argument `mass_matrix` can be used to set the mass matrix `M`.
+
+An optional keyword argument `param_update_func` can be used to set a function that updates problem parameters with
 the current solution. This function must take the in-place form `f(q,u,p,t)` to update some `q`. (`q` might
-simply be `p`.)
+simply be `p`.) This function can be used to update `B1` and `B2` with state information, for example.
 """
 struct ConstrainedODEFunction{iip,static,F1,F2,TMM,C,Ta,Tt,TJ,JVP,VJP,JP,SP,TW,TWt,TPJ,S,TCV,PF} <: AbstractODEFunction{iip}
     odef :: F1
@@ -75,24 +125,14 @@ function ConstrainedODEFunction(r1,r2,B1,B2,L=DiffEqLinearOperator(0*I);
                                                  syms = nothing,
                                                  colorvec = nothing)
 
-    if isinplace(r1,4) && isinplace(r2,3) && isinplace(B1,3) && isinplace(B2,3)
-        @inline r1ext(du,u,p,t) = r1(state(du),state(u),p,t)
-        @inline r2ext(du,u,p,t) = r2(constraint(du),p,t)
-        @inline B1ext_rhs(du,u,p,t) = (dy = state(du); B1(dy,constraint(u),p); dy .*= -1)
-        @inline B2ext_rhs(du,u,p,t) = (dz = constraint(du); B2(dz,state(u),p); dz .*= -1)
-    elseif isinplace(r1,3) && isinplace(r2,2) && isinplace(B1,2) && isinplace(B2,2)
-        @inline r1ext(u,p,t) = r1(state(u),p,t)
-        @inline r2ext(u,p,t) = r2(p,t)
-        @inline B1ext_rhs(u,p,t) = -B1(constraint(u),p)
-        @inline B2ext_rhs(u,p,t) = -B2(state(u),p)
-    else
-        error("Inconsistent function signatures")
-    end
+
+
+    allinplace(r1,r2,B1,B2) || alloutofplace(r1,r2,B1,B2) || error("Inconsistent function signatures")
 
     fill!(_func_cache,0.0)
-    odef_nl = SplitFunction(r1ext,B1ext_rhs;_func_cache=deepcopy(_func_cache))
+    odef_nl = SplitFunction(_complete_r1(r1),_complete_B1(B1);_func_cache=deepcopy(_func_cache))
     odef = SplitFunction(L, odef_nl ;_func_cache=deepcopy(_func_cache))
-    conf = SplitFunction(r2ext,B2ext_rhs;_func_cache=deepcopy(_func_cache))
+    conf = SplitFunction(_complete_r2(r2),_complete_B2(B2);_func_cache=deepcopy(_func_cache))
 
     static = param_update_func == DEFAULT_UPDATE_FUNC ? true : false
 
@@ -113,6 +153,45 @@ end
 @inline _constraint_neg_B2!(du,f::ConstrainedODEFunction,u,p,t) = f.conf.f2(du,u,p,t) # -B_2
 @inline _constraint_r2!(du,f::ConstrainedODEFunction,u,p,t) = f.conf.f1(du,u,p,t) # r_2
 
+allinplace(r1,r2,B1,B2) = _isinplace_r1(r1) && _isinplace_r2(r2) && _isinplace_B1(B1) && _isinplace_B2(B2)
+alloutofplace(r1,r2,B1,B2) = _isoop_r1(r1) && _isoop_r2(r2) && _isoop_B1(B1) && _isoop_B2(B2)
+
+hasextra(r1) = false
+hasextra(r1::ArrayPartition) = true
+
+for (f,nv) in ((:r1,4),(:r2,3),(:B1,3),(:B2,3))
+  iipfcn = Symbol("_isinplace_",string(f))
+  oopfcn = Symbol("_isoop_",string(f))
+  completefcn = Symbol("_complete_",string(f))
+  @eval $iipfcn($f) = isinplace($f,$nv)
+  @eval $iipfcn($f::ArrayPartition) = all(($iipfcn(x) for x in $f.x))
+  @eval $oopfcn($f) = numargs($f) == $(nv-1)
+  @eval $oopfcn($f::ArrayPartition) = all(($oopfcn(x) for x in $f.x))
+  @eval $completefcn($f) = $completefcn($f,Val($iipfcn($f)))
+end
+
+_complete_r1(r1,::Val{true}) = (du,u,p,t) -> r1(state(mainvector(du)),state(mainvector(u)),p,t)
+_complete_r1(r1,::Val{false}) = (u,p,t) -> r1(state(mainvector(u)),p,t)
+
+# these should set up a SplitFunction of these two r1 components
+_complete_r1(r1::ArrayPartition,::Val{true}) =
+          (du,u,p,t) -> ArrayPartition((r1i(dyi,yi,p,t) for (r1i,dyi,yi) in
+                        zip(r1.x,state(mainvector(du)).x,state(mainvector(u)).x))...)
+_complete_r1(r1::ArrayPartition,::Val{false}) =
+          (u,p,t) -> ArrayPartition((r1i(yi,p,t) for (r1i,yi) in zip(r1.x,state(u).x))...)
+
+
+# need to allow the following for cases in which only u.x[1] and du.x[1] are used
+# probably need another argument to choose either u or u.x[1], etc.
+_complete_r2(r2,::Val{true}) = (du,u,p,t) -> r2(constraint(mainvector(du)),p,t)
+_complete_r2(r2,::Val{false}) = (u,p,t) -> r2(p,t)
+
+
+_complete_B1(B1,::Val{true}) = (du,u,p,t) -> (dy = state(mainvector(du)); B1(dy,constraint(mainvector(u)),p); dy .*= -1.0)
+_complete_B1(B1,::Val{false}) = (u,p,t) -> -B1(constraint(mainvector(u)),p)
+
+_complete_B2(B2,::Val{true}) = (du,u,p,t) -> (dz = constraint(mainvector(du)); B2(dz,state(mainvector(u)),p); dz .*= -1.0)
+_complete_B2(B2,::Val{false}) = (u,p,t) -> -B2(state(mainvector(u)),p)
 
 function (f::ConstrainedODEFunction)(du,u,p,t)
     fill!(f.cache,0.0)

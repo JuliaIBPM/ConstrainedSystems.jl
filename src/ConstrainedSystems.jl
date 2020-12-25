@@ -14,7 +14,7 @@ import OrdinaryDiffEq: OrdinaryDiffEqAlgorithm, alg_order, alg_cache,
 
 import OrdinaryDiffEq.DiffEqBase: AbstractDiffEqLinearOperator,
                                   DEFAULT_UPDATE_FUNC, has_exp,
-                                  AbstractODEFunction, isinplace
+                                  AbstractODEFunction, isinplace, numargs
 
 import RecursiveArrayTools: recursivecopy, recursivecopy!, recursive_mean
 

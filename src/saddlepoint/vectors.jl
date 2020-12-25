@@ -18,6 +18,7 @@ function SaddleVector end
 Provide the state part of the given saddle vector `x`
 """
 state(u::SaddleVector) = u.x[1]
+state(u) = u
 
 """
     constraint(x::SaddleVector)
@@ -25,6 +26,7 @@ state(u::SaddleVector) = u.x[1]
 Provide the constraint part of the given saddle vector `x`
 """
 constraint(u::SaddleVector) = u.x[2]
+constraint(u) = eltype(u)[]
 
 for f in (:state,:constraint)
   @eval $f(a::AbstractArray{T}) where {T<:ArrayPartition} = map($f,a)

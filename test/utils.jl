@@ -12,6 +12,23 @@ import ConstrainedSystems: recursivecopy!, needs_iteration
 
 end
 
+@testset "Solution structure" begin
+
+  y = randn(5)
+  z = randn(3)
+  x = randn(2)
+  u = solvector(state=y,constraint=z)
+  @test state(u) === y && constraint(u) === z
+  @test mainvector(u) === u
+
+  u = solvector(state=y,constraint=z,aux_state=x)
+  @test state(mainvector(u)) === y
+  @test constraint(mainvector(u)) === z
+  @test auxvector(u) === x
+
+
+end
+
 @testset "Recursive copy" begin
 
   struct MyStruct{T}
