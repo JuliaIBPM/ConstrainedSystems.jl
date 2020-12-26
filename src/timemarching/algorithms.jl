@@ -252,7 +252,7 @@ end
       param_update_func(pnew,u,pold,ttmp)
       S[1] = SaddleSystem(S[1],Hhalfdt,f,pnew,pold,cache)
       _constraint_r2!(utmp,f,u,pnew,ttmp) # only updates the z part
-      u .= S[1]\utmp
+      mainvector(u) .= S[1]\mainvector(utmp)
       @.. udiff -= u
       numiter += 1
       err = compute_l2err(udiff)
@@ -261,7 +261,7 @@ end
     ytmp .= typeof(ytmp)(S[1].A⁻¹B₁ᵀf)
 
     ldiv!(yprev,Hhalfdt,yprev)
-    ldiv!(k1.x[1],Hhalfdt,k1.x[1])
+    ldiv!(state(k1),Hhalfdt,state(k1))
 
     @.. k1 = (k1-utmp)/(dt*ã11)
 
@@ -281,7 +281,7 @@ end
       S[1] = SaddleSystem(S[1],Hhalfdt,f,pnew,pold,cache)
 
       _constraint_r2!(utmp,f,u,pnew,ttmp)
-      u .= S[1]\utmp
+      mainvector(u) .= S[1]\mainvector(utmp)
       @.. udiff -= u
       numiter += 1
       err = compute_l2err(udiff)
@@ -289,8 +289,8 @@ end
     ytmp .= typeof(ytmp)(S[1].A⁻¹B₁ᵀf)
 
     ldiv!(yprev,Hhalfdt,yprev)
-    ldiv!(k1.x[1],Hhalfdt,k1.x[1])
-    ldiv!(k2.x[1],Hhalfdt,k2.x[1])
+    ldiv!(state(k1),Hhalfdt,state(k1))
+    ldiv!(state(k2),Hhalfdt,state(k2))
 
     @.. k2 = (k2-utmp)/(dt*ã22)
     _ode_r1!(k3,f,u,pnew,ttmp)
@@ -309,7 +309,7 @@ end
       S[2] = SaddleSystem(S[2],Hzero,f,pnew,pold,cache)
 
       _constraint_r2!(utmp,f,u,pnew,t+dt)
-      u .= S[2]\utmp
+      mainvector(u) .= S[2]\mainvector(utmp)
       @.. udiff -= u
       numiter += 1
       err = compute_l2err(udiff)
@@ -372,7 +372,7 @@ end
 
     _constraint_r2!(utmp,f,u,pnew,ttmp) # this should only update the z part
 
-    u .= S[1]\utmp
+    mainvector(u) .= S[1]\mainvector(utmp)
 
     @.. z /= dt
 

@@ -22,9 +22,14 @@ end
   @test mainvector(u) === u
 
   u = solvector(state=y,constraint=z,aux_state=x)
-  @test state(mainvector(u)) === y
-  @test constraint(mainvector(u)) === z
-  @test auxvector(u) === x
+  @test state(u) === y
+  @test constraint(u) === z
+  @test aux_state(u) === x
+
+
+end
+
+@testset "Function structure" begin
 
 
 end

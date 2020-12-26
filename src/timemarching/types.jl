@@ -1,23 +1,4 @@
-export DiffEqLinearOperator, ConstrainedODEFunction, solvector, mainvector, auxvector
-
-"""
-    solvector()
-
-Build a solution vector for a constrained system. This takes three optional keyword
-arguments: `state`, `constraint`, and `aux_state`.
-"""
-solvector(;state=nothing,constraint=nothing,aux_state=nothing) = _solvector(state,constraint,aux_state)
-_solvector(::Nothing,::Nothing,::Nothing) = nothing
-_solvector(state,::Nothing,::Nothing) = state
-_solvector(state,::Nothing,aux_state) = state
-_solvector(state,constraint,::Nothing) = ArrayPartition(state,constraint)
-_solvector(state,constraint,aux_state) = ArrayPartition(_solvector(state,constraint,nothing),aux_state)
-
-mainvector(u) = u
-mainvector(u::ArrayPartition{T,Tuple{A,F}}) where {T,A<:ArrayPartition,F} = u.x[1]
-
-auxvector(u) = Array{eltype(u)}(undef,0,0)
-auxvector(u::ArrayPartition{T,Tuple{A,F}}) where {T,A<:ArrayPartition,F} = u.x[2]
+export DiffEqLinearOperator, ConstrainedODEFunction
 
 
 #### Operator and function types ####
@@ -129,9 +110,12 @@ function ConstrainedODEFunction(r1,r2,B1,B2,L=DiffEqLinearOperator(0*I);
 
     allinplace(r1,r2,B1,B2) || alloutofplace(r1,r2,B1,B2) || error("Inconsistent function signatures")
 
+    L_local = (L isa DiffEqLinearOperator) ? L : DiffEqLinearOperator(L)
+
     fill!(_func_cache,0.0)
-    odef_nl = SplitFunction(_complete_r1(r1),_complete_B1(B1);_func_cache=deepcopy(_func_cache))
-    odef = SplitFunction(L, odef_nl ;_func_cache=deepcopy(_func_cache))
+    odef_nl = SplitFunction(_complete_r1(r1,_func_cache=_func_cache),
+                            _complete_B1(B1);_func_cache=deepcopy(_func_cache))
+    odef = SplitFunction(L_local, odef_nl ;_func_cache=deepcopy(_func_cache))
     conf = SplitFunction(_complete_r2(r2),_complete_B2(B2);_func_cache=deepcopy(_func_cache))
 
     static = param_update_func == DEFAULT_UPDATE_FUNC ? true : false
@@ -156,8 +140,13 @@ end
 allinplace(r1,r2,B1,B2) = _isinplace_r1(r1) && _isinplace_r2(r2) && _isinplace_B1(B1) && _isinplace_B2(B2)
 alloutofplace(r1,r2,B1,B2) = _isoop_r1(r1) && _isoop_r2(r2) && _isoop_B1(B1) && _isoop_B2(B2)
 
-hasextra(r1) = false
-hasextra(r1::ArrayPartition) = true
+hasaux(r1) = false
+hasaux(r1::ArrayPartition) = true
+
+_state_r1(r1) = r1
+_state_r1(r1::ArrayPartition) = r1.x[1]
+_aux_r1(r1::ArrayPartition) = r1.x[2]
+
 
 for (f,nv) in ((:r1,4),(:r2,3),(:B1,3),(:B2,3))
   iipfcn = Symbol("_isinplace_",string(f))
@@ -167,31 +156,31 @@ for (f,nv) in ((:r1,4),(:r2,3),(:B1,3),(:B2,3))
   @eval $iipfcn($f::ArrayPartition) = all(($iipfcn(x) for x in $f.x))
   @eval $oopfcn($f) = numargs($f) == $(nv-1)
   @eval $oopfcn($f::ArrayPartition) = all(($oopfcn(x) for x in $f.x))
-  @eval $completefcn($f) = $completefcn($f,Val($iipfcn($f)))
+  @eval $completefcn($f;_func_cache=nothing) = $completefcn($f,Val($iipfcn($f)),_func_cache)
 end
 
-_complete_r1(r1,::Val{true}) = (du,u,p,t) -> r1(state(mainvector(du)),state(mainvector(u)),p,t)
-_complete_r1(r1,::Val{false}) = (u,p,t) -> r1(state(mainvector(u)),p,t)
-
-# these should set up a SplitFunction of these two r1 components
-_complete_r1(r1::ArrayPartition,::Val{true}) =
-          (du,u,p,t) -> ArrayPartition((r1i(dyi,yi,p,t) for (r1i,dyi,yi) in
-                        zip(r1.x,state(mainvector(du)).x,state(mainvector(u)).x))...)
-_complete_r1(r1::ArrayPartition,::Val{false}) =
-          (u,p,t) -> ArrayPartition((r1i(yi,p,t) for (r1i,yi) in zip(r1.x,state(u).x))...)
+_complete_r1(r1,::Val{true},_func_cache) = (du,u,p,t) -> (dy = state(du); r1(dy,state(u),p,t))
+_complete_r1(r1,::Val{false},_func_cache) = (u,p,t) -> r1(state(u),p,t)
+_complete_r1(r1::ArrayPartition,::Val{true},_func_cache) =
+            SplitFunction((du,u,p,t) ->(dy = state(du); _state_r1(r1)(dy,state(u),p,t)),
+                          (du,u,p,t) ->(dy = aux_state(du); _aux_r1(r1)(dy,aux_state(u),p,t));
+                          _func_cache=deepcopy(_func_cache))
+_complete_r1(r1::ArrayPartition,::Val{false},_func_cache) =
+            SplitFunction((du,u,p) ->r1.x[1](state(u),p,t),
+                          (du,u,p) ->r1.x[2](aux_state(u),p,t))
 
 
 # need to allow the following for cases in which only u.x[1] and du.x[1] are used
 # probably need another argument to choose either u or u.x[1], etc.
-_complete_r2(r2,::Val{true}) = (du,u,p,t) -> r2(constraint(mainvector(du)),p,t)
-_complete_r2(r2,::Val{false}) = (u,p,t) -> r2(p,t)
+_complete_r2(r2,::Val{true},_func_cache) = (du,u,p,t) -> r2(constraint(du),p,t)
+_complete_r2(r2,::Val{false},_func_cache) = (u,p,t) -> r2(p,t)
 
 
-_complete_B1(B1,::Val{true}) = (du,u,p,t) -> (dy = state(mainvector(du)); B1(dy,constraint(mainvector(u)),p); dy .*= -1.0)
-_complete_B1(B1,::Val{false}) = (u,p,t) -> -B1(constraint(mainvector(u)),p)
+_complete_B1(B1,::Val{true},_func_cache) = (du,u,p,t) -> (dy = state(du); B1(dy,constraint(u),p); dy .*= -1.0)
+_complete_B1(B1,::Val{false},_func_cache) = (u,p,t) -> -B1(constraint(u),p)
 
-_complete_B2(B2,::Val{true}) = (du,u,p,t) -> (dz = constraint(mainvector(du)); B2(dz,state(mainvector(u)),p); dz .*= -1.0)
-_complete_B2(B2,::Val{false}) = (u,p,t) -> -B2(state(mainvector(u)),p)
+_complete_B2(B2,::Val{true},_func_cache) = (du,u,p,t) -> (dz = constraint(du); B2(dz,state(u),p); dz .*= -1.0)
+_complete_B2(B2,::Val{false},_func_cache) = (u,p,t) -> -B2(state(u),p)
 
 function (f::ConstrainedODEFunction)(du,u,p,t)
     fill!(f.cache,0.0)

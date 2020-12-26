@@ -24,7 +24,8 @@ import LinearAlgebra: ldiv!, mul!, *, \, I
 
 import Base: size, eltype
 
-export SaddleSystem, SaddleVector, state, constraint, linear_map
+export SaddleSystem, SaddleVector, state, constraint, aux_state, linear_map
+export solvector, mainvector
 export SchurSolverType, Direct, CG, BiCG, GMRES
 
 export System, Constrained, Unconstrained, RK, IFRK, IFHERK, r₁, r₂, B₂, B₁ᵀ,
@@ -60,8 +61,8 @@ const RK31 = RKParams{3}([0.5, 1.0, 1.0],
 const Euler = RKParams{1}([1.0],ones(1,1))
 =#
 
+include("vectors.jl")
 include("saddlepoint/saddlesystems.jl")
-include("saddlepoint/vectors.jl")
 include("saddlepoint/linearmaps.jl")
 include("saddlepoint/arithmetic.jl")
 
