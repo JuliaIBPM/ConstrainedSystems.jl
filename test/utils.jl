@@ -1,4 +1,4 @@
-import ConstrainedSystems: recursivecopy!, needs_iteration
+import ConstrainedSystems: recursivecopy!, needs_iteration, ArrayPartition
 
 @testset "Iteration test" begin
   Δt = 1e-2
@@ -12,11 +12,12 @@ import ConstrainedSystems: recursivecopy!, needs_iteration
 
 end
 
+y = randn(5)
+z = randn(3)
+x = randn(2)
+
 @testset "Solution structure" begin
 
-  y = randn(5)
-  z = randn(3)
-  x = randn(2)
   u = solvector(state=y,constraint=z)
   @test state(u) === y && constraint(u) === z
   @test mainvector(u) === u
@@ -30,6 +31,27 @@ end
 end
 
 @testset "Function structure" begin
+
+  u = solvector(state=y,constraint=z,aux_state=x)
+  du = similar(u)
+  fill!(du,0.0)
+
+  function state_r1!(dy,y,p,t)
+    fill!(dy,1.0)
+  end
+
+  function aux_r1!(dy,y,p,t)
+    fill!(dy,2.0)
+  end
+
+  r1! = ArrayPartition((state_r1!,aux_r1!))
+
+  r1_c! = ConstrainedSystems._complete_r1(r1!,_func_cache=du)
+  r1_c!(du,u,nothing,0.0);
+
+  @test state(du) == fill(1.0,length(y))
+  @test constraint(du) == fill(0.0,length(z))
+  @test aux_state(du) == fill(2.0,length(x))
 
 
 end

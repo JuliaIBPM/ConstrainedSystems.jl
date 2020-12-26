@@ -170,8 +170,6 @@ _complete_r1(r1::ArrayPartition,::Val{false},_func_cache) =
                           (du,u,p) ->r1.x[2](aux_state(u),p,t))
 
 
-# need to allow the following for cases in which only u.x[1] and du.x[1] are used
-# probably need another argument to choose either u or u.x[1], etc.
 _complete_r2(r2,::Val{true},_func_cache) = (du,u,p,t) -> r2(constraint(du),p,t)
 _complete_r2(r2,::Val{false},_func_cache) = (u,p,t) -> r2(p,t)
 
