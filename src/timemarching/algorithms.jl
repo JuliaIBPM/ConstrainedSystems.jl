@@ -151,7 +151,7 @@ function alg_cache(alg::IFHEEuler{solverType},u,rate_prototype,uEltypeNoUnits,uB
 
   typeof(u) <: ArrayPartition || error("u must be of type ArrayPartition")
 
-  y, z = u.x[1], u.x[2]
+  y, z = state(u), constraint(u)
 
   utmp = zero(u)
   k1, dutmp, fsalfirst, k = (zero(rate_prototype) for i in 1:4)
@@ -179,9 +179,14 @@ end
 
 function SaddleSystem(A,f::ConstrainedODEFunction,p,pold,ducache,solver)
     nully, nullz = state(ducache), constraint(ducache)
-    @inline B₁ᵀ(z) = (fill!(ducache,0.0); fill!(nully,0.0); -_ode_neg_B1!(ducache,f,ArrayPartition(nully,z),pold,0.0))
-    @inline B₂(y) = (fill!(ducache,0.0); fill!(nullz,0.0); -_constraint_neg_B2!(ducache,f,ArrayPartition(y,nullz),p,0.0))
-    SaddleSystem(A,B₂,B₁ᵀ,ducache,solver=solver)
+    du_aux = aux_state(ducache)
+    @inline B₁ᵀ(z) = (fill!(ducache,0.0); fill!(nully,0.0);
+                     _ode_neg_B1!(ducache,f,solvector(state=nully,constraint=z,aux_state=du_aux),pold,0.0);
+                     ducache .*= -1.0; return state(ducache))
+    @inline B₂(y) = (fill!(ducache,0.0); fill!(nullz,0.0);
+                     _constraint_neg_B2!(ducache,f,solvector(state=y,constraint=nullz,aux_state=du_aux),p,0.0);
+                     ducache .*= -1.0; return constraint(ducache))
+    SaddleSystem(A,B₂,B₁ᵀ,mainvector(ducache),solver=solver)
 end
 
 @inline SaddleSystem(S::SaddleSystem,A,f::ConstrainedODEFunction,p,pold,ducache,solver,
@@ -257,7 +262,7 @@ end
       numiter += 1
       err = compute_l2err(udiff)
     end
-
+    fill!(utmp,0.0)
     ytmp .= typeof(ytmp)(S[1].A⁻¹B₁ᵀf)
 
     ldiv!(yprev,Hhalfdt,yprev)
@@ -279,13 +284,13 @@ end
       udiff .= u
       param_update_func(pnew,u,pold,ttmp)
       S[1] = SaddleSystem(S[1],Hhalfdt,f,pnew,pold,cache)
-
       _constraint_r2!(utmp,f,u,pnew,ttmp)
       mainvector(u) .= S[1]\mainvector(utmp)
       @.. udiff -= u
       numiter += 1
       err = compute_l2err(udiff)
     end
+    fill!(utmp,0.0)
     ytmp .= typeof(ytmp)(S[1].A⁻¹B₁ᵀf)
 
     ldiv!(yprev,Hhalfdt,yprev)

@@ -9,7 +9,7 @@ mutable struct DiffEqLinearOperator{T,aType} <: AbstractDiffEqLinearOperator{T}
                           dtype=Float64) where {aType} = new{dtype,aType}(L)
 end
 
-(f::DiffEqLinearOperator)(du,u,p,t) = mul!(du.x[1],f.L,u.x[1])
+(f::DiffEqLinearOperator)(du,u,p,t) = mul!(state(du),f.L,state(u))
 
 import Base: exp
 exp(f::DiffEqLinearOperator,args...) = exp(f.L,args...)

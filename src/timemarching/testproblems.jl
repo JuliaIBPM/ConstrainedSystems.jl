@@ -148,20 +148,21 @@ function partitioned_problem(;tmax=1.0)
 
   U₀ = Float64[0,1]
   X₀ = Float64[1,0]
-  y₀ = SaddleVector(U₀,X₀)
-  z₀ = SaddleVector(empty(U₀),Float64[0])
-
-  u₀ = SaddleVector(y₀,z₀)
+  Z₀ = Float64[0]
+  u₀ = solvector(state=X₀,constraint=Z₀,aux_state=U₀)
   du = deepcopy(u₀)
 
-  B₂ = SaddleVector(Array{Float64}(undef,0,2),Array{Float64}(undef,1,2))
-  B₁ᵀ = SaddleVector(Array{Float64}(undef,2,0),Array{Float64}(undef,2,1))
+  B₂ = Array{Float64}(undef,1,2)
+  B₁ᵀ = Array{Float64}(undef,2,1)
 
   p₀ = ProblemParams(par,B₁ᵀ,B₂)
 
-  # Silly to use DiffEqLinearOperator inside and outside...
-  L = DiffEqLinearOperator(SaddleVector(DiffEqLinearOperator(0*I),
-                                        DiffEqLinearOperator(Diagonal([βu,βv]))))
+  L = Diagonal([βu,βv])
+
+  function X_rhs!(dy,y,p,t)
+    fill!(dy,0.0)
+    return dy
+  end
 
   function U_rhs!(dy,y,p,t)
     fill!(dy,0.0)
@@ -171,55 +172,31 @@ function partitioned_problem(;tmax=1.0)
     return dy
   end
 
-  function X_rhs!(dy,y,p,t)
-    fill!(dy,0.0)
-    return dy
-  end
+  ode_rhs! = ArrayPartition((X_rhs!,U_rhs!))
 
-  ode_rhs! = ArrayPartition((U_rhs!,X_rhs!))
-
-  U_constraint_rhs!(dz,p,t) = dz .= Float64[]
-
-  X_constraint_rhs!(dz,p,t) = dz .= Float64[0]
-
-  constraint_rhs! = ArrayPartition((U_constraint_rhs!,X_constraint_rhs!))
+  constraint_rhs!(dz,p,t) = dz .= Float64[0]
 
 
-
-  function U_op_constraint_force!(dy,z,p)
+  function op_constraint_force!(dy,z,p)
     @unpack B₁ᵀ = p
-    dy .= B₁ᵀ.x[1]*z
+    dy .= B₁ᵀ*z
   end
 
-  function X_op_constraint_force!(dy,z,p)
-    @unpack B₁ᵀ = p
-    dy .= B₁ᵀ.x[2]*z
-  end
-
-  op_constraint_force! = ArrayPartition((U_op_constraint_force!,X_op_constraint_force!))
-
-  function U_constraint_op!(dz,y,p)
+  function constraint_op!(dz,y,p)
     @unpack B₂ = p
-    dz .= B₂.x[1]*y
+    dz .= B₂*y
   end
-
-  function X_constraint_op!(dz,y,p)
-    @unpack B₂ = p
-    dz .= B₂.x[2]*y
-  end
-
-  constraint_op! = ArrayPartition((U_constraint_op!,X_constraint_op!))
 
   function update_p!(q,u,p,t)
-    y, z = state(u), constraint(u)
+    x = aux_state(u)
     @unpack B₁ᵀ, B₂ = q
 
     B₁ᵀ .= 0
     B₂  .= 0
-    B₁ᵀ.x[2][1,1] = u[1]
-    B₁ᵀ.x[2][2,1] = u[2]
-    B₂.x[2][1,1] = u[1]
-    B₂.x[2][1,2] = u[2]
+    B₁ᵀ[1,1] = x[1]
+    B₁ᵀ[2,1] = x[2]
+    B₂[1,1] = x[1]
+    B₂[1,2] = x[2]
     return q
   end
 
@@ -229,6 +206,7 @@ function partitioned_problem(;tmax=1.0)
   tmax = 1.0
   tspan = (0.0,tmax)
   p = deepcopy(p₀)
+  update_p!(p,u₀,p,0.0)
   prob = ODEProblem(f,u₀,tspan,p)
 
   function fex(du,u,p,t)
@@ -248,9 +226,11 @@ function partitioned_problem(;tmax=1.0)
   tspan = (0.0,tmax)
   u₀ex = SaddleVector(U₀,X₀)
 
-  probex = ODEProblem(fex,u₀,tspan,par)
+  probex = ODEProblem(fex,u₀ex,tspan,par)
   solex = solve(probex, Tsit5(), reltol=1e-16, abstol=1e-16)
+  xexact(t) = solex(t,idxs=3)
+  yexact(t) = solex(t,idxs=4)
 
-  return prob
+  return prob, xexact, yexact, solex
 
 end
