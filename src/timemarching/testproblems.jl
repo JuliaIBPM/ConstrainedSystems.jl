@@ -140,9 +140,9 @@ end
 
 function partitioned_problem(;tmax=1.0)
 
-  ω = 3
-  βu = -0.1
-  βv = -0.5
+  ω = 1.0
+  βu = 0.0
+  βv = 0.0
 
   par = [ω,βu,βv]
 
@@ -191,19 +191,16 @@ function partitioned_problem(;tmax=1.0)
     x = aux_state(u)
     @unpack B₁ᵀ, B₂ = q
 
-    B₁ᵀ .= 0
-    B₂  .= 0
-    B₁ᵀ[1,1] = x[1]
-    B₁ᵀ[2,1] = x[2]
-    B₂[1,1] = x[1]
-    B₂[1,2] = x[2]
+    B₁ᵀ[1,1] = x[1]/(x[1]^2+x[2]^2)
+    B₁ᵀ[2,1] = x[2]/(x[1]^2+x[2]^2)
+    B₂[1,1] = x[1]/(x[1]^2+x[2]^2)
+    B₂[1,2] = x[2]/(x[1]^2+x[2]^2)
     return q
   end
 
   f = ConstrainedODEFunction(ode_rhs!,constraint_rhs!,op_constraint_force!,
                               constraint_op!,L,_func_cache=deepcopy(du),
                               param_update_func=update_p!)
-  tmax = 1.0
   tspan = (0.0,tmax)
   p = deepcopy(p₀)
   update_p!(p,u₀,p,0.0)

@@ -12,11 +12,14 @@ solvector(;state=nothing,constraint=nothing,aux_state=nothing) = _solvector(stat
 _solvector(::Nothing,::Nothing,::Nothing) = nothing
 _solvector(s,::Nothing,::Nothing) = s
 _solvector(s,::Nothing,aux) = s
-_solvector(s,c,::Nothing) = ArrayPartition(s,c)
-_solvector(s,c,aux) = ArrayPartition(_solvector(s,c,nothing),aux)
+_solvector(s,c,::Nothing) = ArrayPartition(s,c,nothing)
+#_solvector(s,c,aux) = ArrayPartition(_solvector(s,c,nothing),aux)
+_solvector(s,c,aux) = ArrayPartition(s,c,aux)
+
 
 mainvector(u) = u
-mainvector(u::ArrayPartition{T,Tuple{A,F}}) where {T,A<:ArrayPartition,F} = u.x[1]
+#mainvector(u::ArrayPartition{T,Tuple{A,F}}) where {T,A<:ArrayPartition,F} = u.x[1]
+mainvector(u::ArrayPartition) = ArrayPartition(u.x[1],u.x[2])
 
 
 
@@ -43,7 +46,9 @@ constraint(u) = eltype(u)[]
 Provide the auxiliary state part of the given vector `x`
 """
 aux_state(u) = nothing # Array{eltype(u)}(undef,0,0)
-aux_state(u::ArrayPartition{T,Tuple{A,F}}) where {T,A<:ArrayPartition,F} = u.x[2]
+#aux_state(u::ArrayPartition{T,Tuple{A,F}}) where {T,A<:ArrayPartition,F} = u.x[2]
+aux_state(u::ArrayPartition{T,NTuple{3,F}}) where {T,F} = u.x[3]
+
 
 
 for f in (:state,:constraint,:aux_state)

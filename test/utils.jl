@@ -20,7 +20,7 @@ x = randn(2)
 
   u = solvector(state=y,constraint=z)
   @test state(u) === y && constraint(u) === z
-  @test mainvector(u) === u
+  @test mainvector(u) === ArrayPartition(y,z)
 
   u = solvector(state=y,constraint=z,aux_state=x)
   @test state(u) === y

@@ -122,11 +122,12 @@ end
 
 # IFHEEuler
 
-@cache struct IFHEEulerCache{sc,solverType,uType,rateType,expType,saddleType,pType} <: ConstrainedODEMutableCache{sc,solverType}
+@cache struct IFHEEulerCache{sc,ni,solverType,uType,rateType,expType,saddleType,pType} <: ConstrainedODEMutableCache{sc,solverType}
   u::uType
   uprev::uType # qi
   k1::rateType # w1
   utmp::uType  # cache
+  udiff::uType
   dutmp::rateType # cache for rates
   fsalfirst::rateType
   Hdt::expType
@@ -136,14 +137,14 @@ end
   k::rateType
 end
 
-struct IFHEEulerConstantCache{sc,solverType} <: ConstrainedODEConstantCache{sc,solverType}
+struct IFHEEulerConstantCache{sc,ni,solverType} <: ConstrainedODEConstantCache{sc,solverType}
 
 end
 
-IFHEEulerCache{sc,solverType}(u,uprev,k1,utmp,dutmp,fsalfirst,
-                                Hdt,S,pnew,pold,k) where {sc,solverType} =
-        IFHEEulerCache{sc,solverType,typeof(u),typeof(k1),typeof(Hdt),
-                        typeof(S),typeof(pnew)}(u,uprev,k1,utmp,dutmp,fsalfirst,
+IFHEEulerCache{sc,ni,solverType}(u,uprev,k1,utmp,udiff,dutmp,fsalfirst,
+                                Hdt,S,pnew,pold,k) where {sc,ni,solverType} =
+        IFHEEulerCache{sc,ni,solverType,typeof(u),typeof(k1),typeof(Hdt),
+                        typeof(S),typeof(pnew)}(u,uprev,k1,utmp,udiff,dutmp,fsalfirst,
                                                               Hdt,S,pnew,pold,k)
 
 function alg_cache(alg::IFHEEuler{solverType},u,rate_prototype,uEltypeNoUnits,uBottomEltypeNoUnits,
@@ -153,10 +154,11 @@ function alg_cache(alg::IFHEEuler{solverType},u,rate_prototype,uEltypeNoUnits,uB
 
   y, z = state(u), constraint(u)
 
-  utmp = zero(u)
+  utmp, udiff = (zero(u) for i in 1:2)
   k1, dutmp, fsalfirst, k = (zero(rate_prototype) for i in 1:4)
 
   sc = isstatic(f)
+  ni = needs_iteration(f,u,p,rate_prototype)
 
   A = f.odef.f1.f
   Hdt = exp(A,-dt,y)
@@ -164,7 +166,7 @@ function alg_cache(alg::IFHEEuler{solverType},u,rate_prototype,uEltypeNoUnits,uB
   S = []
   push!(S,SaddleSystem(Hdt,f,p,p,dutmp,solverType))
 
-  IFHEEulerCache{sc,solverType}(u,uprev,k1,utmp,dutmp,fsalfirst,
+  IFHEEulerCache{sc,ni,solverType}(u,uprev,k1,utmp,udiff,dutmp,fsalfirst,
                                   Hdt,S,deepcopy(p),deepcopy(p),k)
 end
 
@@ -221,8 +223,8 @@ end
 end
 
 @muladd function perform_step!(integrator,cache::LiskaIFHERKCache{sc,ni,solverType},repeat_step=false) where {sc,ni,solverType}
-    @unpack t,dt,uprev,u,f,p = integrator
-    @unpack maxiter, tol = integrator.alg
+    @unpack t,dt,uprev,u,f,p,alg = integrator
+    @unpack maxiter, tol = alg
     @unpack k1,k2,k3,utmp,udiff,dutmp,fsalfirst,Hhalfdt,Hzero,S,pnew,pold,k = cache
     @unpack ã11,ã21,ã22,ã31,ã32,ã33,c̃1,c̃2,c̃3 = cache.tab
     @unpack param_update_func = f
@@ -235,7 +237,7 @@ end
     # aliases to the state and constraint parts
     ytmp, ztmp = state(utmp), constraint(utmp)
     yprev = state(uprev)
-    y, z = state(u), constraint(u)
+    y, z, x = state(u), constraint(u), aux_state(u)
 
     ttmp = t
     u .= uprev
@@ -252,6 +254,7 @@ end
     recursivecopy!(pold,pnew)
     err, numiter = init_err, init_iter
     u .= utmp # initial guess for iterations
+    #println("u = ",u)
     while err > tol && numiter <= maxiter
       udiff .= u
       param_update_func(pnew,u,pold,ttmp)
@@ -311,6 +314,7 @@ end
     while err > tol && numiter <= maxiter
       udiff .= u
       param_update_func(pnew,u,pold,ttmp)
+
       S[2] = SaddleSystem(S[2],Hzero,f,pnew,pold,cache)
 
       _constraint_r2!(utmp,f,u,pnew,t+dt)
@@ -349,10 +353,14 @@ function initialize!(integrator,cache::IFHEEulerCache)
 
 end
 
-@muladd function perform_step!(integrator,cache::IFHEEulerCache{sc,solverType},repeat_step=false) where {sc,solverType}
-    @unpack t,dt,uprev,u,f,p = integrator
-    @unpack k1,utmp,dutmp,fsalfirst,Hdt,S,pnew,pold,k = cache
+@muladd function perform_step!(integrator,cache::IFHEEulerCache{sc,ni,solverType},repeat_step=false) where {sc,ni,solverType}
+    @unpack t,dt,uprev,u,f,p,alg = integrator
+    @unpack k1,utmp,udiff,dutmp,fsalfirst,Hdt,S,pnew,pold,k = cache
+    @unpack maxiter, tol = alg
     @unpack param_update_func = f
+
+    init_err = float(1)
+    init_iter = ni ? 1 : maxiter
 
     recursivecopy!(pnew,p)
 
@@ -372,12 +380,21 @@ end
 
     # if applicable, update p, construct new saddle system here, using Hdt
     recursivecopy!(pold,pnew)
-    param_update_func(pnew,utmp,pold,ttmp)
-    S[1] = SaddleSystem(S[1],Hdt,f,pnew,pold,cache)
+    err, numiter = init_err, init_iter
+    u .= utmp
+    while err > tol && numiter <= maxiter
+      udiff .= u
+      param_update_func(pnew,u,pold,ttmp)
 
-    _constraint_r2!(utmp,f,u,pnew,ttmp) # this should only update the z part
+      S[1] = SaddleSystem(S[1],Hdt,f,pnew,pold,cache)
 
-    mainvector(u) .= S[1]\mainvector(utmp)
+      _constraint_r2!(utmp,f,u,pnew,t+dt)
+      mainvector(u) .= S[1]\mainvector(utmp)
+      @.. udiff -= u
+      numiter += 1
+      err = compute_l2err(udiff)
+      #println("error = ",err)
+    end
 
     @.. z /= dt
 
