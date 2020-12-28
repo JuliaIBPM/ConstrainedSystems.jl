@@ -255,7 +255,6 @@ end
     recursivecopy!(pold,pnew)
     err, numiter = init_err, init_iter
     u .= utmp # initial guess for iterations
-    #println("u = ",u)
     while err > tol && numiter <= maxiter
       udiff .= u
       param_update_func(pnew,u,pold,ttmp)
@@ -403,8 +402,6 @@ end
 
     param_update_func(pnew,u,p,t)
     f.odef(integrator.fsallast, u, pnew, t+dt)
-
-    #println("u = ",u)
 
     recursivecopy!(p,pnew)
 

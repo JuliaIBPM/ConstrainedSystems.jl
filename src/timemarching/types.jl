@@ -186,6 +186,7 @@ zero_aux!(x) = fill!(x,0.0)
 
 function (f::ConstrainedODEFunction)(du,u,p,t)
     fill!(f.cache,0.0)
+    fill!(du,0.0)
     f.odef(f.cache,u,p,t)
     f.conf(du,u,p,t)
     du .+= f.cache

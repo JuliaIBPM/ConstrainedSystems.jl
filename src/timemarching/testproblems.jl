@@ -161,8 +161,6 @@ function partitioned_problem(;tmax=1.0)
 
   function X_rhs!(dy,y,p,t)
     fill!(dy,0.0)
-    dy[1] = p.params[2]*y[1]
-    dy[2] = p.params[3]*y[2]
     return dy
   end
 
@@ -194,47 +192,49 @@ function partitioned_problem(;tmax=1.0)
     x = aux_state(u)
     @unpack B₁ᵀ, B₂ = q
 
-    B₁ᵀ[1,1] = -sin(p.params[1]*t)
-    B₁ᵀ[2,1] = cos(p.params[1]*t)
-    B₂[1,1] = -sin(p.params[1]*t)
-    B₂[1,2] = cos(p.params[1]*t)
-    #B₁ᵀ[1,1] = x[1] #/(x[1]^2+x[2]^2)
-    #B₁ᵀ[2,1] = x[2] #/(x[1]^2+x[2]^2)
-    #B₂[1,1] = x[1] #/(x[1]^2+x[2]^2)
-    #B₂[1,2] = x[2] #/(x[1]^2+x[2]^2)
+    B₁ᵀ[1,1] = x[1]
+    B₁ᵀ[2,1] = x[2]
+    B₂[1,1] = x[1]
+    B₂[1,2] = x[2]
     return q
   end
 
   f = ConstrainedODEFunction(ode_rhs!,constraint_rhs!,op_constraint_force!,
-                              constraint_op!,_func_cache=deepcopy(du), # removed L temporarily
+                              constraint_op!,L,_func_cache=deepcopy(du),
                               param_update_func=update_p!)
   tspan = (0.0,tmax)
   p = deepcopy(p₀)
   update_p!(p,u₀,p,0.0)
   prob = ODEProblem(f,u₀,tspan,p)
 
-  function fex(du,u,p,t)
-    UV = u.x[1]
-    xy = u.x[2]
-    ω = p[1]
-    βu = p[2]
-    βv = p[3]
-    du[1] = -ω*cos(ω*t)
-    du[2] = -ω*sin(ω*t)
-    Usq = u[1]^2+u[2]^2
-    du[3] = (βu-u[1]/Usq*(du[1]+βu*u[1]))*u[3] - u[1]/Usq*(du[2]+βv*u[2])*u[4]
-    du[4] = -u[2]/Usq*(du[1]+βu*u[1])*u[3] + (βv-u[2]/Usq*(du[2]+βv*u[2]))*u[4]
-    return nothing
-  end
+  # function fex(du,u,p,t)
+  #   UV = u.x[1]
+  #   xy = u.x[2]
+  #   ω = p[1]
+  #   βu = p[2]
+  #   βv = p[3]
+  #   du[1] = -ω*cos(ω*t)
+  #   du[2] = -ω*sin(ω*t)
+  #   Usq = u[1]^2+u[2]^2
+  #   du[3] = (βu-u[1]/Usq*(du[1]+βu*u[1]))*u[3] - u[1]/Usq*(du[2]+βv*u[2])*u[4]
+  #   du[4] = -u[2]/Usq*(du[1]+βu*u[1])*u[3] + (βv-u[2]/Usq*(du[2]+βv*u[2]))*u[4]
+  #   return nothing
+  # end
+  #
+  # tspan = (0.0,tmax)
+  # u₀ex = SaddleVector(U₀,X₀)
+  #
+  # probex = ODEProblem(fex,u₀ex,tspan,par)
+  # solex = solve(probex, Tsit5(), reltol=1e-16, abstol=1e-16)
+  # xexact(t) = solex(t,idxs=3)
+  # yexact(t) = solex(t,idxs=4)
 
-  tspan = (0.0,tmax)
-  u₀ex = SaddleVector(U₀,X₀)
 
-  probex = ODEProblem(fex,u₀ex,tspan,par)
-  solex = solve(probex, Tsit5(), reltol=1e-16, abstol=1e-16)
-  xexact(t) = solex(t,idxs=3)
-  yexact(t) = solex(t,idxs=4)
+  fex(t) = exp(0.5*(βu+βv)*t)*exp(0.25/ω*sin(2ω*t)*(βu-βv))
+  xexact(t) = cos(ω*t)*fex(t)
+  yexact(t) = sin(ω*t)*fex(t)
 
-  return prob, xexact, yexact, solex
+
+  return prob, xexact, yexact
 
 end
