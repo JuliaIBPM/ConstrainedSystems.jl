@@ -400,6 +400,7 @@ end
       S[1] = SaddleSystem(S[1],Hdt,f,pnew,pold,cache)
 
       _constraint_r2!(utmp,f,u,pnew,t+dt)
+
       mainvector(u) .= S[1]\mainvector(utmp)
       @.. udiff -= u
       numiter += 1
@@ -468,6 +469,7 @@ end
     S = SaddleSystem(Hdt,f,pnew,pold,ducache,solverType)
 
     constraint(utmp) .= constraint(_constraint_r2(f,u,pnew,t+dt))
+
     mainvector(u) .= S\mainvector(utmp)
 
     @.. udiff -= u
@@ -482,7 +484,7 @@ end
 
   k = f.odef(u, pnew, t+dt)
 
-  p = deepcopy(pnew)
+  recursivecopy!(p,pnew)
 
   integrator.destats.nf += 1
   integrator.fsallast = k

@@ -5,7 +5,7 @@ struct ProblemParams{P,BT1,BT2}
 end
 
 
-function basic_constrained_problem(;tmax=1.0)
+function basic_constrained_problem(;tmax=1.0,iip=true)
 
   U0 = 1.0
   g = 1.0
@@ -18,7 +18,7 @@ function basic_constrained_problem(;tmax=1.0)
 
   p₀ = ProblemParams(params,Array{Float64}(undef,4,1),Array{Float64}(undef,1,4));
 
-  u₀ = SaddleVector(y₀,z₀)
+  u₀ = solvector(state=y₀,constraint=z₀)
   du = deepcopy(u₀)
 
   function ode_rhs!(dy::Vector{Float64},y::Vector{Float64},p,t)
@@ -28,18 +28,22 @@ function basic_constrained_problem(;tmax=1.0)
     dy[4] = -(y[1]-p.params[1]*t)*p.params[2]
     return dy
   end
+  ode_rhs(y::Vector{Float64},p,t) = ode_rhs!(deepcopy(y₀),y,p,t)
 
   constraint_rhs!(dz::Vector{Float64},p,t) = dz .= Float64[p.params[1]]
+  constraint_rhs(p,t) = constraint_rhs!(deepcopy(z₀),p,t)
 
   function op_constraint_force!(dy::Vector{Float64},z::Vector{Float64},p)
     @unpack B₁ᵀ = p
     dy .= B₁ᵀ*z
   end
+  op_constraint_force(z::Vector{Float64},p) = op_constraint_force!(deepcopy(y₀),z,p)
 
   function constraint_op!(dz::Vector{Float64},y::Vector{Float64},p)
     @unpack B₂ = p
     dz .= B₂*y
   end
+  constraint_op(y::Vector{Float64},p) = constraint_op!(deepcopy(z₀),y,p)
 
   function update_p!(q,u,p,t)
     y, z = state(u), constraint(u)
@@ -50,10 +54,16 @@ function basic_constrained_problem(;tmax=1.0)
     B₂[1,3] = 1/(1+q.params[3]*sin(q.params[4]*t))
     return q
   end
+  update_p(u,p,t) = update_p!(deepcopy(p),u,p,t)
 
-  f = ConstrainedODEFunction(ode_rhs!,constraint_rhs!,op_constraint_force!,
+  if iip
+    f = ConstrainedODEFunction(ode_rhs!,constraint_rhs!,op_constraint_force!,
                               constraint_op!,_func_cache=deepcopy(du),
                                             param_update_func=update_p!)
+  else
+    f = ConstrainedODEFunction(ode_rhs,constraint_rhs,op_constraint_force,
+                              constraint_op,param_update_func=update_p)
+   end
 
   tspan = (0.0,tmax)
   p = deepcopy(p₀)
@@ -66,7 +76,7 @@ function basic_constrained_problem(;tmax=1.0)
 end
 
 
-function cartesian_pendulum_problem(;tmax=1.0)
+function cartesian_pendulum_problem(;tmax=1.0,iip=true)
 
   θ₀ = π/2
   l = 1.0
@@ -74,11 +84,12 @@ function cartesian_pendulum_problem(;tmax=1.0)
   y₀ = Float64[l*sin(θ₀),-l*cos(θ₀),0,0]
   z₀ = Float64[0.0, 0.0]
 
-  u₀ = SaddleVector(y₀,z₀)
+  u₀ = solvector(state=y₀,constraint=z₀)
   du = deepcopy(u₀)
 
   params = [l,g]
   p₀ = ProblemParams(params,Array{Float64}(undef,4,2),Array{Float64}(undef,2,4))
+
 
   function pendulum_rhs!(dy::Vector{Float64},y::Vector{Float64},p,t)
     dy .= 0.0
@@ -88,17 +99,24 @@ function cartesian_pendulum_problem(;tmax=1.0)
     return dy
   end
 
+  pendulum_rhs(y::Vector{Float64},p,t) = pendulum_rhs!(zero(y),y,p,t)
+
+
   length_constraint_rhs!(dz::Vector{Float64},p,t) = dz .= [0.0,p.params[1]^2]
+  length_constraint_rhs(p,t) = length_constraint_rhs!(zero(z₀),p,t)
+
 
   function length_constraint_force!(dy::Vector{Float64},z::Vector{Float64},p)
     @unpack B₁ᵀ = p
     dy .= B₁ᵀ*z
   end
+  length_constraint_force(z::Vector{Float64},p) = length_constraint_force!(zero(y₀),z,p)
 
   function length_constraint_op!(dz::Vector{Float64},y::Vector{Float64},p)
     @unpack B₂ = p
     dz .= B₂*y
   end
+  length_constraint_op(y::Vector{Float64},p) = length_constraint_op!(zero(z₀),y,p)
 
   function update_p!(q,u,p,t)
     y, z = state(u), constraint(u)
@@ -109,10 +127,17 @@ function cartesian_pendulum_problem(;tmax=1.0)
     B₂[1,3] = y[1]; B₂[1,4] = y[2]; B₂[2,1] = y[1]; B₂[2,2] = y[2]
     return q
   end
+  update_p(u,p,t) = update_p!(deepcopy(p),u,p,t)
 
-  f = ConstrainedODEFunction(pendulum_rhs!,length_constraint_rhs!,length_constraint_force!,
-                              length_constraint_op!,
-                              _func_cache=deepcopy(du),param_update_func=update_p!)
+  if iip
+    f = ConstrainedODEFunction(pendulum_rhs!,length_constraint_rhs!,length_constraint_force!,
+                                length_constraint_op!,
+                               _func_cache=deepcopy(du),param_update_func=update_p!)
+  else
+    f = ConstrainedODEFunction(pendulum_rhs,length_constraint_rhs,length_constraint_force,
+                                length_constraint_op,param_update_func=update_p)
+  end
+
   tspan = (0.0,tmax)
   p = deepcopy(p₀)
   prob = ODEProblem(f,u₀,tspan,p)
@@ -138,7 +163,7 @@ function cartesian_pendulum_problem(;tmax=1.0)
 
 end
 
-function partitioned_problem(;tmax=1.0)
+function partitioned_problem(;tmax=1.0,iip=true)
 
   ω = 1.0
   βu = -0.2
@@ -163,6 +188,7 @@ function partitioned_problem(;tmax=1.0)
     fill!(dy,0.0)
     return dy
   end
+  X_rhs(y,p,t) = X_rhs!(deepcopy(X₀),y,p,t)
 
   function U_rhs!(dy,y,p,t)
     fill!(dy,0.0)
@@ -171,22 +197,26 @@ function partitioned_problem(;tmax=1.0)
     dy[2] = -ω*sin(ω*t)
     return dy
   end
+  U_rhs(y,p,t) = U_rhs!(deepcopy(U₀),y,p,t)
 
   ode_rhs! = ArrayPartition((X_rhs!,U_rhs!))
+  ode_rhs = ArrayPartition((X_rhs,U_rhs))
 
   constraint_rhs!(dz,p,t) = dz .= Float64[0]
-
+  constraint_rhs(p,t) = constraint_rhs!(deepcopy(Z₀),p,t)
 
   function op_constraint_force!(dy,z,p)
     @unpack B₁ᵀ = p
     dy .= B₁ᵀ*z
     return dy
   end
+  op_constraint_force(z,p) = op_constraint_force!(deepcopy(X₀),z,p)
 
   function constraint_op!(dz,y,p)
     @unpack B₂ = p
     dz .= B₂*y
   end
+  constraint_op(y,p) = constraint_op!(deepcopy(Z₀),y,p)
 
   function update_p!(q,u,p,t)
     x = aux_state(u)
@@ -198,10 +228,17 @@ function partitioned_problem(;tmax=1.0)
     B₂[1,2] = x[2]
     return q
   end
+  update_p(u,p,t) = update_p!(deepcopy(p),u,p,t)
 
-  f = ConstrainedODEFunction(ode_rhs!,constraint_rhs!,op_constraint_force!,
+  if iip
+    f = ConstrainedODEFunction(ode_rhs!,constraint_rhs!,op_constraint_force!,
                               constraint_op!,L,_func_cache=deepcopy(du),
                               param_update_func=update_p!)
+  else
+    f = ConstrainedODEFunction(ode_rhs,constraint_rhs,op_constraint_force,
+                              constraint_op,L,param_update_func=update_p)
+  end
+
   tspan = (0.0,tmax)
   p = deepcopy(p₀)
   update_p!(p,u₀,p,0.0)
@@ -237,60 +274,4 @@ function partitioned_problem(;tmax=1.0)
 
   return prob, xexact, yexact
 
-end
-
-# out of place
-
-function basic_constrained_problem_oop(;tmax=1.0)
-
-  U0 = 1.0
-  g = 1.0
-  α = 0.5
-  ω = 5
-  y₀ = Float64[0,0,U0,0]
-  z₀ = Float64[0]
-
-  params = [U0,g,α,ω];
-
-  p₀ = ProblemParams(params,Array{Float64}(undef,4,1),Array{Float64}(undef,1,4));
-
-  u₀ = SaddleVector(y₀,z₀)
-  du = deepcopy(u₀)
-
-  function ode_rhs(y::Vector{Float64},p,t)
-    dy = zero(y)
-    dy[1] = y[3]
-    dy[2] = y[4]
-    dy[4] = -(y[1]-p.params[1]*t)*p.params[2]
-    return dy
-  end
-
-  constraint_rhs(p,t) = Float64[p.params[1]]
-
-  op_constraint_force(z::Vector{Float64},p) = p.B₁ᵀ*z
-
-  constraint_op(y::Vector{Float64},p) = p.B₂*y
-
-  function update_p(u,p,t)
-    q = deepcopy(p)
-
-    @unpack B₁ᵀ, B₂ = q
-    B₁ᵀ .= 0
-    B₂ .= 0
-    B₁ᵀ[3,1] = 1/(1+q.params[3]*sin(q.params[4]*t))
-    B₂[1,3] = 1/(1+q.params[3]*sin(q.params[4]*t))
-    return q
-  end
-
-  f = ConstrainedODEFunction(ode_rhs,constraint_rhs,op_constraint_force,
-                              constraint_op,param_update_func=update_p)
-
-  tspan = (0.0,tmax)
-  p = deepcopy(p₀)
-  prob = ODEProblem(f,u₀,tspan,p)
-
-  yexact(t) = g*α*U0/ω*(-0.5*t^2 - cos(ω*t)/ω^2 + 1/ω^2)
-  xexact(t) = U0*(t - α*cos(ω*t)/ω+α/ω)
-
-  return prob, xexact, yexact
 end
