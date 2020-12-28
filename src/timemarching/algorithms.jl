@@ -290,16 +290,150 @@ end
       err = _l2norm(udiff)
       #println("error = ",err)
     end
-
     @.. z /= (dt*ã33)
 
+    # Final steps
     param_update_func(pnew,u,pold,t+dt)
-
     f.odef(integrator.fsallast, u, pnew, t+dt)
-
+    integrator.destats.nf += 1
     recursivecopy!(p,pnew)
 
+    return nothing
+end
+
+function initialize!(integrator,cache::LiskaIFHERKConstantCache)
+  integrator.kshortsize = 2
+  integrator.k = typeof(integrator.k)(undef, integrator.kshortsize)
+  integrator.fsalfirst = integrator.f.odef(integrator.uprev, integrator.p, integrator.t) # Pre-start fsal
+  integrator.p = integrator.f.param_update_func(integrator.uprev,integrator.p,integrator.t)
+  integrator.destats.nf += 1
+
+  # Avoid undefined entries if k is an array of arrays
+  integrator.fsallast = zero(integrator.fsalfirst)
+  integrator.k[1] = integrator.fsalfirst
+  integrator.k[2] = integrator.fsallast
+end
+
+@muladd function perform_step!(integrator,cache::LiskaIFHERKConstantCache{sc,ni,solverType},repeat_step=false) where {sc,ni,solverType}
+    @unpack t,dt,uprev,f,p,alg = integrator
+    @unpack maxiter, tol = alg
+    @unpack ã11,ã21,ã22,ã31,ã32,ã33,c̃1,c̃2,c̃3 = cache
+    @unpack param_update_func = f
+
+    init_err = float(1)
+    init_iter = ni ? 1 : maxiter
+
+    # set up some cache variables
+    yprev = state(uprev)
+    udiff = deepcopy(uprev)
+    ducache = deepcopy(uprev)
+    pnew = deepcopy(p)
+    L = _fetch_ode_L(f)
+    Hhalfdt = exp(L,-dt/2,state(uprev))
+    Hzero = exp(L,zero(dt),state(uprev))
+
+
+    ## Stage 1
+    ttmp = t
+    k1 = _ode_r1(f,uprev,pnew,ttmp)
     integrator.destats.nf += 1
+    @.. k1 *= dt*ã11
+    utmp = @.. uprev + k1
+    ttmp = t + dt*c̃1
+
+    # if applicable, update p, construct new saddle system here, using Hhalfdt
+    # and solve system. Solve iteratively if saddle operators depend on
+    # constrained part of the state.
+    pold = deepcopy(pnew)
+    err, numiter = init_err, init_iter
+    u = deepcopy(utmp)
+    while err > tol && numiter <= maxiter
+      udiff .= u
+      pnew = param_update_func(u,pold,ttmp)
+      S = SaddleSystem(Hhalfdt,f,pnew,pold,ducache,solverType)
+      constraint(utmp) .= constraint(_constraint_r2(f,u,pnew,ttmp))
+      mainvector(u) .= S\mainvector(utmp)
+      B1_times_z!(ducache,S)
+
+      @.. udiff -= u
+      numiter += 1
+      err = _l2norm(udiff)
+    end
+    zero_vec!(aux_state(utmp))
+    state(utmp) .= state(ducache)
+
+
+    ldiv!(yprev,Hhalfdt,yprev)
+    ldiv!(state(k1),Hhalfdt,state(k1))
+
+    @.. k1 = (k1-utmp)/(dt*ã11)  # r1(y,t) - B1T*z
+
+    ## Stage 2
+    k2 = _ode_r1(f,u,pnew,ttmp)
+    integrator.destats.nf += 1
+    @.. k2 *= dt*ã22
+    @.. utmp = uprev + k2 + dt*ã21*k1
+    ttmp = t + dt*c̃2
+
+    # if applicable, update p, construct new saddle system here, using Hhalfdt
+    pold = deepcopy(pnew)
+    err, numiter = init_err, init_iter
+    u .= utmp
+    while err > tol && numiter <= maxiter
+      udiff .= u
+      pnew = param_update_func(u,pold,ttmp)
+      S = SaddleSystem(Hhalfdt,f,pnew,pold,ducache,solverType)
+      constraint(utmp) .= constraint(_constraint_r2(f,u,pnew,ttmp))
+      mainvector(u) .= S\mainvector(utmp)
+      B1_times_z!(ducache,S)
+      @.. udiff -= u
+      numiter += 1
+      err = _l2norm(udiff)
+    end
+    zero_vec!(aux_state(utmp))
+    state(utmp) .= state(ducache)
+
+    ldiv!(yprev,Hhalfdt,yprev)
+    ldiv!(state(k1),Hhalfdt,state(k1))
+    ldiv!(state(k2),Hhalfdt,state(k2))
+
+    @.. k2 = (k2-utmp)/(dt*ã22)
+
+    ## Stage 3
+    k3 = _ode_r1(f,u,pnew,ttmp)
+    integrator.destats.nf += 1
+    @.. k3 *= dt*ã33
+    @.. utmp = uprev + k3 + dt*ã32*k2 + dt*ã31*k1
+    ttmp = t + dt
+
+    # if applicable, update p, construct new saddle system here, using Hzero (identity)
+    pold = deepcopy(pnew)
+    err, numiter = init_err, init_iter
+    u .= utmp
+    while err > tol && numiter <= maxiter
+      udiff .= u
+      pnew = param_update_func(u,pold,ttmp)
+      S = SaddleSystem(Hzero,f,pnew,pold,ducache,solverType)
+      constraint(utmp) .= constraint(_constraint_r2(f,u,pnew,ttmp))
+      mainvector(u) .= S\mainvector(utmp)
+      @.. udiff -= u
+      numiter += 1
+      err = _l2norm(udiff)
+      #println("error = ",err)
+    end
+    @.. constraint(u) /= (dt*ã33)
+
+    # Final steps
+    pnew = param_update_func(u,p,t)
+    k = f.odef(u, pnew, t+dt)
+    integrator.destats.nf += 1
+    recursivecopy!(p,pnew)
+
+    integrator.fsallast = k
+    integrator.k[1] = integrator.fsalfirst
+    integrator.k[2] = integrator.fsallast
+    integrator.u = u
+
     return nothing
 end
 
@@ -350,26 +484,22 @@ end
     while err > tol && numiter <= maxiter
       udiff .= u
       param_update_func(pnew,u,pold,ttmp)
-
       S[1] = SaddleSystem(S[1],Hdt,f,pnew,pold,cache)
-
       _constraint_r2!(utmp,f,u,pnew,t+dt)
-
       mainvector(u) .= S[1]\mainvector(utmp)
       @.. udiff -= u
       numiter += 1
       err = _l2norm(udiff)
       #println("error = ",err)
     end
-
     @.. z /= dt
 
+    # Final steps
     param_update_func(pnew,u,p,t)
     f.odef(integrator.fsallast, u, pnew, t+dt)
-
+    integrator.destats.nf += 1
     recursivecopy!(p,pnew)
 
-    integrator.destats.nf += 1
     return nothing
 end
 
@@ -388,20 +518,20 @@ function initialize!(integrator,cache::IFHEEulerConstantCache)
 end
 
 @muladd function perform_step!(integrator,cache::IFHEEulerConstantCache{sc,ni,solverType},repeat_step=false) where {sc,ni,solverType}
-  @unpack t,dt,uprev,f,p, alg = integrator
+  @unpack t,dt,uprev,f,p,alg = integrator
   @unpack maxiter, tol = alg
   @unpack param_update_func = f
-
-  udiff = deepcopy(uprev)
-  ducache = deepcopy(uprev)
 
   init_err = float(1)
   init_iter = ni ? 1 : maxiter
 
+  # set up some cache variables
+  udiff = deepcopy(uprev)
+  ducache = deepcopy(uprev)
+  pnew = deepcopy(p)
   L = _fetch_ode_L(f)
   Hdt = exp(L,-dt,state(uprev))
 
-  pnew = deepcopy(p)
 
   k1 = _ode_r1(f,uprev,pnew,t)
   integrator.destats.nf += 1
@@ -423,14 +553,14 @@ end
     err = _l2norm(udiff)
     #println("error = ",err)
   end
-
   @.. constraint(u) /= dt
 
+  # Final steps
   pnew = param_update_func(u,p,t)
   k = f.odef(u, pnew, t+dt)
+  integrator.destats.nf += 1
   recursivecopy!(p,pnew)
 
-  integrator.destats.nf += 1
   integrator.fsallast = k
   integrator.k[1] = integrator.fsalfirst
   integrator.k[2] = integrator.fsallast
