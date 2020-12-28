@@ -1,6 +1,16 @@
 export DiffEqLinearOperator, ConstrainedODEFunction
 
 
+### Abstract algorithms ###
+abstract type ConstrainedOrdinaryDiffEqAlgorithm <: OrdinaryDiffEq.OrdinaryDiffEqAlgorithm end
+
+### Abstract caches ###
+# The sc parameter specifies whether it contains static constraint operators or not
+# If false, then it expects that the state vector contains a component for updating the opertors
+abstract type ConstrainedODEMutableCache{sc,solverType} <: OrdinaryDiffEqMutableCache end
+abstract type ConstrainedODEConstantCache{sc,solverType} <: OrdinaryDiffEqConstantCache end
+
+
 #### Operator and function types ####
 
 mutable struct DiffEqLinearOperator{T,aType} <: AbstractDiffEqLinearOperator{T}
@@ -66,13 +76,13 @@ B_2 y = r_2(t)
 The optional linear operator `L` defaults to zeros. The `B1` and `B2` functions must be of the respective
 in-place forms `B1(dy,z,p)` (to compute the action of `B1` on `z`) and `B2(dz,y,p)` (to compute that action
 of `B2` on `y`). The function `r1` must of the in-place form `r1(dy,y,p,t)`, and `r2` must be in the in-place form
-`r2(dz,p,t)`.
-
-The optional keyword argument `mass_matrix` can be used to set the mass matrix `M`.
+`r2(dz,p,t)`. Alternatively, one can supply out-of-place forms, respectively, as `B1(z,p)`, `B2(y,p)`,
+`r1(y,p,t)` and `r2(p,t)`.
 
 An optional keyword argument `param_update_func` can be used to set a function that updates problem parameters with
-the current solution. This function must take the in-place form `f(q,u,p,t)` to update some `q`. (`q` might
-simply be `p`.) This function can be used to update `B1` and `B2` with state information, for example.
+the current solution. This function must take the in-place form `f(q,u,p,t)` or out of place form
+`f(u,p,t)` to create some `q` based on `u`. (Note that `q` might enter the function simply as `p`.) This function can
+be used to update `B1` and `B2` with state information, for example.
 """
 struct ConstrainedODEFunction{iip,static,F1,F2,TMM,C,Ta,Tt,TJ,JVP,VJP,JP,SP,TW,TWt,TPJ,S,TCV,PF} <: AbstractODEFunction{iip}
     odef :: F1
@@ -155,8 +165,9 @@ hasaux(r1) = false
 hasaux(r1::ArrayPartition) = true
 
 _state_r1(r1) = r1
-_aux_r1(r1) = nothing
 _state_r1(r1::ArrayPartition) = r1.x[1]
+
+_aux_r1(r1) = nothing
 _aux_r1(r1::ArrayPartition) = r1.x[2]
 
 
@@ -190,9 +201,6 @@ _complete_B1(B1,::Val{false},_func_cache) = (u,p,t) -> (du = deepcopy(u); zero_v
 
 _complete_B2(B2,::Val{true},_func_cache) = (du,u,p,t) -> (dz = constraint(du); B2(dz,state(u),p); dz .*= -1.0)
 _complete_B2(B2,::Val{false},_func_cache) = (u,p,t) -> (du = deepcopy(u); zero_vec!(du); constraint(du) .= -B2(state(u),p); return du)
-
-zero_vec!(::Nothing) = nothing
-zero_vec!(x) = fill!(x,0.0)
 
 function (f::ConstrainedODEFunction)(du,u,p,t)
     fill!(f.cache,0.0)

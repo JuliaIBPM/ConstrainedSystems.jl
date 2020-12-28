@@ -1,13 +1,10 @@
 ## Definitions of algorithms ##
 
-# The sc parameter specifies whether it contains static constraint operators or not
-# If false, then it expects that the state vector contains a component for updating the opertors
 
 # WrayHERK is scheme C in Liska and Colonius (JCP 2016)
 # BraseyHairerHERK is scheme B in Liska and Colonius (JCP 2016)
 # LiskaIFHERK is scheme A in Liska and Colonius (JCP 2016)
 
-abstract type ConstrainedOrdinaryDiffEqAlgorithm <: OrdinaryDiffEq.OrdinaryDiffEqAlgorithm end
 
 for (Alg,Order) in [(:WrayHERK,3),(:BraseyHairerHERK,3),(:LiskaIFHERK,2),(:IFHEEuler,1)]
     @eval struct $Alg{solverType} <: ConstrainedOrdinaryDiffEqAlgorithm
@@ -22,10 +19,6 @@ for (Alg,Order) in [(:WrayHERK,3),(:BraseyHairerHERK,3),(:LiskaIFHERK,2),(:IFHEE
     @eval alg_order(alg::$Alg) = $Order
 end
 
-### Caches ###
-
-abstract type ConstrainedODEMutableCache{sc,solverType} <: OrdinaryDiffEqMutableCache end
-abstract type ConstrainedODEConstantCache{sc,solverType} <: OrdinaryDiffEqConstantCache end
 
 
 # LiskaIFHERK
@@ -176,41 +169,6 @@ function alg_cache(alg::IFHEEuler{solverType},u,rate_prototype,
   IFHEEulerConstantCache{isstatic(f),needs_iteration(f,u,p,rate_prototype),solverType}()
 end
 
-###############
-
-function SaddleSystem(A,f::ConstrainedODEFunction{true},p,pold,ducache,solver)
-    nully, nullz = state(ducache), constraint(ducache)
-    du_aux = aux_state(ducache)
-    @inline B₁ᵀ(z) = (fill!(ducache,0.0);
-                     _ode_neg_B1!(ducache,f,solvector(state=nully,constraint=z,aux_state=du_aux),pold,0.0);
-                     ducache .*= -1.0; return state(ducache))
-    @inline B₂(y) = (fill!(ducache,0.0);
-                     _constraint_neg_B2!(ducache,f,solvector(state=y,constraint=nullz,aux_state=du_aux),p,0.0);
-                     ducache .*= -1.0; return constraint(ducache))
-    SaddleSystem(A,B₂,B₁ᵀ,mainvector(ducache),solver=solver)
-end
-
-function SaddleSystem(A,f::ConstrainedODEFunction{false},p,pold,ducache,solver)
-
-    nully, nullz = state(ducache), constraint(ducache)
-    du_aux = aux_state(ducache)
-    @inline B₁ᵀ(z) = (zero_vec!(ducache); ducache .= _ode_neg_B1(f,solvector(state=nully,constraint=z,aux_state=du_aux),pold,0.0);
-                     ducache .*= -1.0; return state(ducache))
-    @inline B₂(y) = (zero_vec!(ducache);
-                     ducache .= _constraint_neg_B2(f,solvector(state=y,constraint=nullz,aux_state=du_aux),p,0.0);
-                     ducache .*= -1.0; return constraint(ducache))
-    SaddleSystem(A,B₂,B₁ᵀ,mainvector(ducache),solver=solver)
-end
-
-@inline SaddleSystem(S::SaddleSystem,A,f::ConstrainedODEFunction,p,pold,ducache,solver,
-                      ::Val{false}) = SaddleSystem(A,f,p,pold,ducache,solver)
-
-@inline SaddleSystem(S::SaddleSystem,A,f::ConstrainedODEFunction,p,pold,ducache,solver,
-                      ::Val{true}) = S
-
-@inline SaddleSystem(S::SaddleSystem,A,f::ConstrainedODEFunction,p,pold,
-                      cache::ConstrainedODEMutableCache{sc,solverType}) where {sc,solverType} =
-          SaddleSystem(S,A,f,p,pold,cache.dutmp,solverType,Val(sc))
 
 #######
 
@@ -230,7 +188,6 @@ function initialize!(integrator,cache::LiskaIFHERKCache)
 end
 
 
-
 @muladd function perform_step!(integrator,cache::LiskaIFHERKCache{sc,ni,solverType},repeat_step=false) where {sc,ni,solverType}
     @unpack t,dt,uprev,u,f,p,alg = integrator
     @unpack maxiter, tol = alg
@@ -241,8 +198,6 @@ end
     init_err = float(1)
     init_iter = ni ? 1 : maxiter
 
-    recursivecopy!(pnew,p)
-
     # aliases to the state and constraint parts
     ytmp, ztmp, xtmp = state(utmp), constraint(utmp), aux_state(utmp)
     yprev = state(uprev)
@@ -250,7 +205,9 @@ end
 
     ttmp = t
     u .= uprev
+    recursivecopy!(pnew,p)
 
+    ## Stage 1
     _ode_r1!(k1,f,u,pnew,ttmp)
     integrator.destats.nf += 1
     @.. k1 *= dt*ã11
@@ -274,14 +231,14 @@ end
       err = _l2norm(udiff)
     end
     zero_vec!(xtmp)
-    ytmp .= typeof(ytmp)(S[1].A⁻¹B₁ᵀf)
-
+    B1_times_z!(utmp,S[1])
 
     ldiv!(yprev,Hhalfdt,yprev)
     ldiv!(state(k1),Hhalfdt,state(k1))
 
-    @.. k1 = (k1-utmp)/(dt*ã11)
+    @.. k1 = (k1-utmp)/(dt*ã11)  # r1(y,t) - B1T*z
 
+    ## Stage 2
     _ode_r1!(k2,f,u,pnew,ttmp)
     integrator.destats.nf += 1
     @.. k2 *= dt*ã22
@@ -303,13 +260,15 @@ end
       err = _l2norm(udiff)
     end
     zero_vec!(xtmp)
-    ytmp .= typeof(ytmp)(S[1].A⁻¹B₁ᵀf)
+    B1_times_z!(utmp,S[1])
 
     ldiv!(yprev,Hhalfdt,yprev)
     ldiv!(state(k1),Hhalfdt,state(k1))
     ldiv!(state(k2),Hhalfdt,state(k2))
 
     @.. k2 = (k2-utmp)/(dt*ã22)
+
+    ## Stage 3
     _ode_r1!(k3,f,u,pnew,ttmp)
     integrator.destats.nf += 1
     @.. k3 *= dt*ã33
@@ -323,9 +282,7 @@ end
     while err > tol && numiter <= maxiter
       udiff .= u
       param_update_func(pnew,u,pold,ttmp)
-
       S[2] = SaddleSystem(S[2],Hzero,f,pnew,pold,cache)
-
       _constraint_r2!(utmp,f,u,pnew,t+dt)
       mainvector(u) .= S[2]\mainvector(utmp)
       @.. udiff -= u
@@ -372,15 +329,13 @@ end
     init_err = float(1)
     init_iter = ni ? 1 : maxiter
 
-    recursivecopy!(pnew,p)
-
     # aliases to the state and constraint parts
     ytmp, ztmp = state(utmp), constraint(utmp)
-    yprev = state(uprev)
     z = constraint(u)
 
     ttmp = t
     u .= uprev
+    recursivecopy!(pnew,p)
 
     _ode_r1!(k1,f,u,pnew,ttmp)
     integrator.destats.nf += 1
@@ -448,9 +403,6 @@ end
 
   pnew = deepcopy(p)
 
-  # aliases to the state and constraint parts
-  yprev = state(uprev)
-
   k1 = _ode_r1(f,uprev,pnew,t)
   integrator.destats.nf += 1
   @.. k1 *= dt
@@ -459,18 +411,13 @@ end
   # if applicable, update p, construct new saddle system here, using Hdt
   pold = deepcopy(pnew)
   err, numiter = init_err, init_iter
-
   u = deepcopy(utmp)
   while err > tol && numiter <= maxiter
     udiff .= u
     pnew = param_update_func(u,pold,t+dt)
-
     S = SaddleSystem(Hdt,f,pnew,pold,ducache,solverType)
-
     constraint(utmp) .= constraint(_constraint_r2(f,u,pnew,t+dt))
-
     mainvector(u) .= S\mainvector(utmp)
-
     @.. udiff -= u
     numiter += 1
     err = _l2norm(udiff)
@@ -480,9 +427,7 @@ end
   @.. constraint(u) /= dt
 
   pnew = param_update_func(u,p,t)
-
   k = f.odef(u, pnew, t+dt)
-
   recursivecopy!(p,pnew)
 
   integrator.destats.nf += 1

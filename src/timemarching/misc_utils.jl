@@ -23,6 +23,10 @@ macro cache(expr)
   end
 end
 
+zero_vec!(::Nothing) = nothing
+zero_vec!(x) = fill!(x,0.0)
+
+
 function recursivecopy!(dest :: T, src :: T) where {T}
     fields = fieldnames(T)
     for f in fields
