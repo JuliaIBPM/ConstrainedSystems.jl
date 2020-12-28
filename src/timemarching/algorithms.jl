@@ -174,19 +174,31 @@ function alg_cache(alg::IFHEEuler{solverType},u,rate_prototype,
                                   uEltypeNoUnits,uBottomEltypeNoUnits,
                                   tTypeNoUnits,uprev,uprev2,f,t,dt,reltol,
                                   p,calck,::Val{false}) where {solverType}
-  IFHEEulerCacheConstantCache{isstatic(f),solverType}()
+  IFHEEulerConstantCache{isstatic(f),needs_iteration(f,u,p,rate_prototype),solverType}()
 end
 
 ###############
 
-function SaddleSystem(A,f::ConstrainedODEFunction,p,pold,ducache,solver)
+function SaddleSystem(A,f::ConstrainedODEFunction{true},p,pold,ducache,solver)
     nully, nullz = state(ducache), constraint(ducache)
     du_aux = aux_state(ducache)
-    @inline B₁ᵀ(z) = (fill!(ducache,0.0); fill!(nully,0.0);
+    @inline B₁ᵀ(z) = (fill!(ducache,0.0);
                      _ode_neg_B1!(ducache,f,solvector(state=nully,constraint=z,aux_state=du_aux),pold,0.0);
                      ducache .*= -1.0; return state(ducache))
-    @inline B₂(y) = (fill!(ducache,0.0); fill!(nullz,0.0);
+    @inline B₂(y) = (fill!(ducache,0.0);
                      _constraint_neg_B2!(ducache,f,solvector(state=y,constraint=nullz,aux_state=du_aux),p,0.0);
+                     ducache .*= -1.0; return constraint(ducache))
+    SaddleSystem(A,B₂,B₁ᵀ,mainvector(ducache),solver=solver)
+end
+
+function SaddleSystem(A,f::ConstrainedODEFunction{false},p,pold,ducache,solver)
+
+    nully, nullz = state(ducache), constraint(ducache)
+    du_aux = aux_state(ducache)
+    @inline B₁ᵀ(z) = (zero_vec!(ducache); ducache .= _ode_neg_B1(f,solvector(state=nully,constraint=z,aux_state=du_aux),pold,0.0);
+                     ducache .*= -1.0; return state(ducache))
+    @inline B₂(y) = (zero_vec!(ducache);
+                     ducache .= _constraint_neg_B2(f,solvector(state=y,constraint=nullz,aux_state=du_aux),p,0.0);
                      ducache .*= -1.0; return constraint(ducache))
     SaddleSystem(A,B₂,B₁ᵀ,mainvector(ducache),solver=solver)
 end
@@ -218,9 +230,7 @@ function initialize!(integrator,cache::LiskaIFHERKCache)
 
 end
 
-@inline function compute_l2err(u)
-  sqrt(RecursiveArrayTools.recursive_mean(map(x -> float(x).^2,u)))
-end
+
 
 @muladd function perform_step!(integrator,cache::LiskaIFHERKCache{sc,ni,solverType},repeat_step=false) where {sc,ni,solverType}
     @unpack t,dt,uprev,u,f,p,alg = integrator
@@ -235,10 +245,9 @@ end
     recursivecopy!(pnew,p)
 
     # aliases to the state and constraint parts
-    ytmp, ztmp = state(utmp), constraint(utmp)
+    ytmp, ztmp, xtmp = state(utmp), constraint(utmp), aux_state(utmp)
     yprev = state(uprev)
     y, z, x = state(u), constraint(u), aux_state(u)
-    main = mainvector(u)
 
     ttmp = t
     u .= uprev
@@ -260,12 +269,12 @@ end
       param_update_func(pnew,u,pold,ttmp)
       S[1] = SaddleSystem(S[1],Hhalfdt,f,pnew,pold,cache)
       _constraint_r2!(utmp,f,u,pnew,ttmp) # only updates the z part
-      main .= S[1]\mainvector(utmp)
+      mainvector(u) .= S[1]\mainvector(utmp)
       @.. udiff -= u
       numiter += 1
-      err = compute_l2err(udiff)
+      err = _l2norm(udiff)
     end
-    fill!(utmp,0.0)
+    zero_vec!(xtmp)
     ytmp .= typeof(ytmp)(S[1].A⁻¹B₁ᵀf)
 
 
@@ -292,9 +301,9 @@ end
       mainvector(u) .= S[1]\mainvector(utmp)
       @.. udiff -= u
       numiter += 1
-      err = compute_l2err(udiff)
+      err = _l2norm(udiff)
     end
-    fill!(utmp,0.0)
+    zero_vec!(xtmp)
     ytmp .= typeof(ytmp)(S[1].A⁻¹B₁ᵀf)
 
     ldiv!(yprev,Hhalfdt,yprev)
@@ -322,7 +331,7 @@ end
       mainvector(u) .= S[2]\mainvector(utmp)
       @.. udiff -= u
       numiter += 1
-      err = compute_l2err(udiff)
+      err = _l2norm(udiff)
       #println("error = ",err)
     end
 
@@ -394,7 +403,7 @@ end
       mainvector(u) .= S[1]\mainvector(utmp)
       @.. udiff -= u
       numiter += 1
-      err = compute_l2err(udiff)
+      err = _l2norm(udiff)
       #println("error = ",err)
     end
 
@@ -407,4 +416,77 @@ end
 
     integrator.destats.nf += 1
     return nothing
+end
+
+
+function initialize!(integrator,cache::IFHEEulerConstantCache)
+  integrator.kshortsize = 2
+  integrator.k = typeof(integrator.k)(undef, integrator.kshortsize)
+  integrator.fsalfirst = integrator.f.odef(integrator.uprev, integrator.p, integrator.t) # Pre-start fsal
+  integrator.p = integrator.f.param_update_func(integrator.uprev,integrator.p,integrator.t)
+  integrator.destats.nf += 1
+
+  # Avoid undefined entries if k is an array of arrays
+  integrator.fsallast = zero(integrator.fsalfirst)
+  integrator.k[1] = integrator.fsalfirst
+  integrator.k[2] = integrator.fsallast
+end
+
+@muladd function perform_step!(integrator,cache::IFHEEulerConstantCache{sc,ni,solverType},repeat_step=false) where {sc,ni,solverType}
+  @unpack t,dt,uprev,f,p, alg = integrator
+  @unpack maxiter, tol = alg
+  @unpack param_update_func = f
+
+  udiff = deepcopy(uprev)
+  ducache = deepcopy(uprev)
+
+  init_err = float(1)
+  init_iter = ni ? 1 : maxiter
+
+  L = _fetch_ode_L(f)
+  Hdt = exp(L.f,-dt,state(uprev))
+
+  pnew = deepcopy(p)
+
+  # aliases to the state and constraint parts
+  yprev = state(uprev)
+
+  k1 = _ode_r1(f,uprev,pnew,t)
+  integrator.destats.nf += 1
+  @.. k1 *= dt
+  utmp = @.. uprev + k1
+
+  # if applicable, update p, construct new saddle system here, using Hdt
+  pold = deepcopy(pnew)
+  err, numiter = init_err, init_iter
+
+  u = deepcopy(utmp)
+  while err > tol && numiter <= maxiter
+    udiff .= u
+    pnew = param_update_func(u,pold,t+dt)
+
+    S = SaddleSystem(Hdt,f,pnew,pold,ducache,solverType)
+
+    constraint(utmp) .= constraint(_constraint_r2(f,u,pnew,t+dt))
+    mainvector(u) .= S\mainvector(utmp)
+
+    @.. udiff -= u
+    numiter += 1
+    err = _l2norm(udiff)
+    #println("error = ",err)
+  end
+
+  @.. constraint(u) /= dt
+
+  pnew = param_update_func(u,p,t)
+
+  k = f.odef(u, pnew, t+dt)
+
+  p = deepcopy(pnew)
+
+  integrator.destats.nf += 1
+  integrator.fsallast = k
+  integrator.k[1] = integrator.fsalfirst
+  integrator.k[2] = integrator.fsallast
+  integrator.u = u
 end

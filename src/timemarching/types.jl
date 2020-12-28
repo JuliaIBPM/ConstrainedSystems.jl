@@ -10,6 +10,8 @@ mutable struct DiffEqLinearOperator{T,aType} <: AbstractDiffEqLinearOperator{T}
 end
 
 (f::DiffEqLinearOperator)(du,u,p,t) = (dy = state(du); mul!(dy,f.L,state(u)))
+(f::DiffEqLinearOperator)(u,p,t) = (du = deepcopy(u); zero_vec!(du); dy = state(du); mul!(dy,f.L,state(u)); return du)
+
 
 import Base: exp
 exp(f::DiffEqLinearOperator,args...) = exp(f.L,args...)
@@ -112,7 +114,7 @@ function ConstrainedODEFunction(r1,r2,B1,B2,L=DiffEqLinearOperator(0*I);
 
     L_local = (L isa DiffEqLinearOperator) ? L : DiffEqLinearOperator(L)
 
-    fill!(_func_cache,0.0)
+    zero_vec!(_func_cache)
     odef_nl = SplitFunction(_complete_r1(r1,_func_cache=_func_cache),
                             _complete_B1(B1);_func_cache=deepcopy(_func_cache))
     odef = SplitFunction(L_local, odef_nl ;_func_cache=deepcopy(_func_cache))
@@ -130,12 +132,27 @@ function ConstrainedODEFunction(r1,r2,B1,B2,L=DiffEqLinearOperator(0*I);
                            sparsity,Wfact,Wfact_t,paramjac,syms,colorvec,param_update_func)
 end
 
-@inline _ode_L!(du,f::ConstrainedODEFunction,u,p,t) = f.odef.f1(du,u,p,t) # L
-@inline _ode_r1!(du,f::ConstrainedODEFunction,u,p,t) = f.odef.f2.f.f1(du,u,p,t) # r_1
+@inline _fetch_ode_L(f::ConstrainedODEFunction) = f.odef.f1
+@inline _fetch_ode_r1(f::ConstrainedODEFunction) = f.odef.f2.f.f1
+@inline _fetch_ode_neg_B1(f::ConstrainedODEFunction) = f.odef.f2.f.f2
+@inline _fetch_constraint_neg_B2(f::ConstrainedODEFunction) = f.conf.f2
+@inline _fetch_constraint_r2(f::ConstrainedODEFunction) = f.conf.f1
 
-@inline _ode_neg_B1!(du,f::ConstrainedODEFunction,u,p,t) = f.odef.f2.f.f2(du,u,p,t) # -B_1^T
-@inline _constraint_neg_B2!(du,f::ConstrainedODEFunction,u,p,t) = f.conf.f2(du,u,p,t) # -B_2
-@inline _constraint_r2!(du,f::ConstrainedODEFunction,u,p,t) = f.conf.f1(du,u,p,t) # r_2
+
+@inline _ode_L!(du,f::ConstrainedODEFunction,u,p,t) = _fetch_ode_L(f)(du,u,p,t) # L
+@inline _ode_r1!(du,f::ConstrainedODEFunction,u,p,t) = _fetch_ode_r1(f)(du,u,p,t) # r_1
+
+@inline _ode_neg_B1!(du,f::ConstrainedODEFunction,u,p,t) = _fetch_ode_neg_B1(f)(du,u,p,t) # -B_1^T
+@inline _constraint_neg_B2!(du,f::ConstrainedODEFunction,u,p,t) = _fetch_constraint_neg_B2(f)(du,u,p,t) # -B_2
+@inline _constraint_r2!(du,f::ConstrainedODEFunction,u,p,t) = _fetch_constraint_r2(f)(du,u,p,t) # r_2
+
+@inline _ode_L(f::ConstrainedODEFunction,u,p,t) = _fetch_ode_L(f)(u,p,t) # L
+@inline _ode_r1(f::ConstrainedODEFunction,u,p,t) = _fetch_ode_r1(f)(u,p,t) # r_1
+
+@inline _ode_neg_B1(f::ConstrainedODEFunction,u,p,t) = _fetch_ode_neg_B1(f)(u,p,t) # -B_1^T
+@inline _constraint_neg_B2(f::ConstrainedODEFunction,u,p,t) = _fetch_constraint_neg_B2(f)(u,p,t) # -B_2
+@inline _constraint_r2(f::ConstrainedODEFunction,u,p,t) = _fetch_constraint_r2(f)(u,p,t) # r_2
+
 
 allinplace(r1,r2,B1,B2) = _isinplace_r1(r1) && _isinplace_r2(r2) && _isinplace_B1(B1) && _isinplace_B2(B2)
 alloutofplace(r1,r2,B1,B2) = _isoop_r1(r1) && _isoop_r2(r2) && _isoop_B1(B1) && _isoop_B2(B2)
@@ -161,28 +178,27 @@ for (f,nv) in ((:r1,4),(:r2,3),(:B1,3),(:B2,3))
 end
 
 _complete_r1(r1,::Val{true},_func_cache) = (du,u,p,t) -> (dy = state(du); r1(dy,state(u),p,t))
-_complete_r1(r1,::Val{false},_func_cache) = (u,p,t) -> r1(state(u),p,t)
+_complete_r1(r1,::Val{false},_func_cache) = (u,p,t) -> (du = deepcopy(u); zero_vec!(du); state(du) .= r1(state(u),p,t); return du)
 _complete_r1(r1::ArrayPartition,::Val{true},_func_cache) =
-            SplitFunction((du,u,p,t) ->(dy = state(du); dx = aux_state(du); zero_aux!(dx); _state_r1(r1)(dy,state(u),p,t)),
+            SplitFunction((du,u,p,t) ->(dy = state(du); dx = aux_state(du); zero_vec!(dx); _state_r1(r1)(dy,state(u),p,t)),
                           (du,u,p,t) ->(dy = state(du); dx = aux_state(du); fill!(dy,0.0); _aux_r1(r1)(dx,aux_state(u),p,t));
                           _func_cache=deepcopy(_func_cache))
 _complete_r1(r1::ArrayPartition,::Val{false},_func_cache) =
-            SplitFunction((du,u,p) ->r1.x[1](state(u),p,t),
-                          (du,u,p) ->r1.x[2](aux_state(u),p,t))
+            SplitFunction((u,p,t) -> (du = deepcopy(u); zero_vec!(du); state(du) .= _state_r1(r1)(state(u),p,t); return du),
+                          (u,p,t) -> (du = deepcopy(u); zero_vec!(du); aux_state(du) .= _aux_r1(r1)(aux_state(u),p,t); return du))
 
 
 _complete_r2(r2,::Val{true},_func_cache) = (du,u,p,t) -> (dz = constraint(du); r2(dz,p,t))
-_complete_r2(r2,::Val{false},_func_cache) = (u,p,t) -> r2(p,t)
+_complete_r2(r2,::Val{false},_func_cache) = (u,p,t) -> (du = deepcopy(u); zero_vec!(du); constraint(du) .= r2(p,t); return du)
 
-
-_complete_B1(B1,::Val{true},_func_cache) = (du,u,p,t) -> (dy = state(du); dx = aux_state(du); zero_aux!(dx); B1(dy,constraint(u),p); dy .*= -1.0)
-_complete_B1(B1,::Val{false},_func_cache) = (u,p,t) -> -B1(constraint(u),p)
+_complete_B1(B1,::Val{true},_func_cache) = (du,u,p,t) -> (dy = state(du); dx = aux_state(du); zero_vec!(dx); B1(dy,constraint(u),p); dy .*= -1.0)
+_complete_B1(B1,::Val{false},_func_cache) = (u,p,t) -> (du = deepcopy(u); zero_vec!(du); state(du) .= -B1(constraint(u),p); return du)
 
 _complete_B2(B2,::Val{true},_func_cache) = (du,u,p,t) -> (dz = constraint(du); B2(dz,state(u),p); dz .*= -1.0)
-_complete_B2(B2,::Val{false},_func_cache) = (u,p,t) -> -B2(state(u),p)
+_complete_B2(B2,::Val{false},_func_cache) = (u,p,t) -> (du = deepcopy(u); zero_vec!(du); constraint(du) .= -B2(state(u),p); return du)
 
-zero_aux!(::Nothing) = nothing
-zero_aux!(x) = fill!(x,0.0)
+zero_vec!(::Nothing) = nothing
+zero_vec!(x) = fill!(x,0.0)
 
 function (f::ConstrainedODEFunction)(du,u,p,t)
     fill!(f.cache,0.0)
@@ -191,5 +207,8 @@ function (f::ConstrainedODEFunction)(du,u,p,t)
     f.conf(du,u,p,t)
     du .+= f.cache
 end
+
+(f::ConstrainedODEFunction)(u,p,t) = f.odef(u,p,t) + f.conf(u,p,t)
+
 
 @inline isstatic(f::ConstrainedODEFunction) = f.param_update_func == DEFAULT_UPDATE_FUNC ? true : false

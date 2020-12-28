@@ -12,7 +12,7 @@ solvector(;state=nothing,constraint=nothing,aux_state=nothing) = _solvector(stat
 _solvector(::Nothing,::Nothing,::Nothing) = nothing
 _solvector(s,::Nothing,::Nothing) = s
 _solvector(s,::Nothing,aux) = s
-_solvector(s,c,::Nothing) = ArrayPartition(s,c,nothing)
+_solvector(s,c,::Nothing) = ArrayPartition(s,c)
 #_solvector(s,c,aux) = ArrayPartition(_solvector(s,c,nothing),aux)
 _solvector(s,c,aux) = ArrayPartition(s,c,aux)
 

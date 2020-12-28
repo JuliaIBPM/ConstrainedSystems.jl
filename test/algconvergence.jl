@@ -51,4 +51,12 @@ solutions2 = [solve(prob,IFHEEuler();dt=dts[i]) for i=1:length(dts)]
 @test 𝒪est1[:l2][1] ≈ 2 atol=testTol
 @test 𝒪est2[:l2][1] ≈ 1 atol=testTol
 
+prob, xexact, yexact = ConstrainedSystems.basic_constrained_problem_oop()
+
+solutions2 = [solve(prob,IFHEEuler();dt=dts[i]) for i=1:length(dts)]
+
+𝒪est2 = compute𝒪est(solutions2,1,xexact)
+
+@test 𝒪est2[:l2][1] ≈ 1 atol=testTol
+
 end

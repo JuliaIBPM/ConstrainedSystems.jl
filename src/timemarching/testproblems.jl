@@ -238,3 +238,59 @@ function partitioned_problem(;tmax=1.0)
   return prob, xexact, yexact
 
 end
+
+# out of place
+
+function basic_constrained_problem_oop(;tmax=1.0)
+
+  U0 = 1.0
+  g = 1.0
+  α = 0.5
+  ω = 5
+  y₀ = Float64[0,0,U0,0]
+  z₀ = Float64[0]
+
+  params = [U0,g,α,ω];
+
+  p₀ = ProblemParams(params,Array{Float64}(undef,4,1),Array{Float64}(undef,1,4));
+
+  u₀ = SaddleVector(y₀,z₀)
+  du = deepcopy(u₀)
+
+  function ode_rhs(y::Vector{Float64},p,t)
+    dy = zero(y)
+    dy[1] = y[3]
+    dy[2] = y[4]
+    dy[4] = -(y[1]-p.params[1]*t)*p.params[2]
+    return dy
+  end
+
+  constraint_rhs(p,t) = Float64[p.params[1]]
+
+  op_constraint_force(z::Vector{Float64},p) = p.B₁ᵀ*z
+
+  constraint_op(y::Vector{Float64},p) = p.B₂*y
+
+  function update_p(u,p,t)
+    q = deepcopy(p)
+
+    @unpack B₁ᵀ, B₂ = q
+    B₁ᵀ .= 0
+    B₂ .= 0
+    B₁ᵀ[3,1] = 1/(1+q.params[3]*sin(q.params[4]*t))
+    B₂[1,3] = 1/(1+q.params[3]*sin(q.params[4]*t))
+    return q
+  end
+
+  f = ConstrainedODEFunction(ode_rhs,constraint_rhs,op_constraint_force,
+                              constraint_op,param_update_func=update_p)
+
+  tspan = (0.0,tmax)
+  p = deepcopy(p₀)
+  prob = ODEProblem(f,u₀,tspan,p)
+
+  yexact(t) = g*α*U0/ω*(-0.5*t^2 - cos(ω*t)/ω^2 + 1/ω^2)
+  xexact(t) = U0*(t - α*cos(ω*t)/ω+α/ω)
+
+  return prob, xexact, yexact
+end
