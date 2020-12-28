@@ -96,9 +96,9 @@ function alg_cache(alg::LiskaIFHERK{solverType},u,rate_prototype,uEltypeNoUnits,
   tab = LiskaIFHERKConstantCache{sc,ni,solverType}(constvalue(uBottomEltypeNoUnits),
                                                 constvalue(tTypeNoUnits))
 
-  A = f.odef.f1.f
-  Hhalfdt = exp(A,-dt/2,y)
-  Hzero = exp(A,zero(dt),y)
+  L = _fetch_ode_L(f)
+  Hhalfdt = exp(L,-dt/2,y)
+  Hzero = exp(L,zero(dt),y)
 
   S = []
   push!(S,SaddleSystem(Hhalfdt,f,p,p,dutmp,solverType))
@@ -160,8 +160,7 @@ function alg_cache(alg::IFHEEuler{solverType},u,rate_prototype,uEltypeNoUnits,uB
   sc = isstatic(f)
   ni = needs_iteration(f,u,p,rate_prototype)
 
-  A = f.odef.f1.f
-  Hdt = exp(A,-dt,y)
+  Hdt = exp(_fetch_ode_L(f),-dt,y)
 
   S = []
   push!(S,SaddleSystem(Hdt,f,p,p,dutmp,solverType))
@@ -445,7 +444,7 @@ end
   init_iter = ni ? 1 : maxiter
 
   L = _fetch_ode_L(f)
-  Hdt = exp(L.f,-dt,state(uprev))
+  Hdt = exp(L,-dt,state(uprev))
 
   pnew = deepcopy(p)
 

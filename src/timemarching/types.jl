@@ -18,6 +18,8 @@ exp(f::DiffEqLinearOperator,args...) = exp(f.L,args...)
 exp(f::ArrayPartition,t,x::ArrayPartition) =
                 ArrayPartition((exp(Li,t,xi) for (Li,xi) in zip(f.L.x,x.x))...)
 
+exp(f::ODEFunction,args...) = exp(f.f,args...)
+
 
 has_exp(::DiffEqLinearOperator) = true
 
@@ -139,20 +141,12 @@ end
 @inline _fetch_constraint_r2(f::ConstrainedODEFunction) = f.conf.f1
 
 
-@inline _ode_L!(du,f::ConstrainedODEFunction,u,p,t) = _fetch_ode_L(f)(du,u,p,t) # L
-@inline _ode_r1!(du,f::ConstrainedODEFunction,u,p,t) = _fetch_ode_r1(f)(du,u,p,t) # r_1
-
-@inline _ode_neg_B1!(du,f::ConstrainedODEFunction,u,p,t) = _fetch_ode_neg_B1(f)(du,u,p,t) # -B_1^T
-@inline _constraint_neg_B2!(du,f::ConstrainedODEFunction,u,p,t) = _fetch_constraint_neg_B2(f)(du,u,p,t) # -B_2
-@inline _constraint_r2!(du,f::ConstrainedODEFunction,u,p,t) = _fetch_constraint_r2(f)(du,u,p,t) # r_2
-
-@inline _ode_L(f::ConstrainedODEFunction,u,p,t) = _fetch_ode_L(f)(u,p,t) # L
-@inline _ode_r1(f::ConstrainedODEFunction,u,p,t) = _fetch_ode_r1(f)(u,p,t) # r_1
-
-@inline _ode_neg_B1(f::ConstrainedODEFunction,u,p,t) = _fetch_ode_neg_B1(f)(u,p,t) # -B_1^T
-@inline _constraint_neg_B2(f::ConstrainedODEFunction,u,p,t) = _fetch_constraint_neg_B2(f)(u,p,t) # -B_2
-@inline _constraint_r2(f::ConstrainedODEFunction,u,p,t) = _fetch_constraint_r2(f)(u,p,t) # r_2
-
+for fcn in (:_ode_L,:_ode_r1,:_ode_neg_B1,:_constraint_neg_B2,:_constraint_r2)
+  fetchfcn = Symbol("_fetch",string(fcn))
+  iipfcn = Symbol(string(fcn),"!")
+  @eval $iipfcn(du,f::ConstrainedODEFunction,u,p,t) = $fetchfcn(f)(du,u,p,t)
+  @eval $fcn(f::ConstrainedODEFunction,u,p,t) = $fetchfcn(f)(u,p,t)
+end
 
 allinplace(r1,r2,B1,B2) = _isinplace_r1(r1) && _isinplace_r2(r2) && _isinplace_B1(B1) && _isinplace_B2(B2)
 alloutofplace(r1,r2,B1,B2) = _isoop_r1(r1) && _isoop_r2(r2) && _isoop_B1(B1) && _isoop_B2(B2)
