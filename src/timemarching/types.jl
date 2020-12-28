@@ -9,7 +9,7 @@ mutable struct DiffEqLinearOperator{T,aType} <: AbstractDiffEqLinearOperator{T}
                           dtype=Float64) where {aType} = new{dtype,aType}(L)
 end
 
-(f::DiffEqLinearOperator)(du,u,p,t) = mul!(state(du),f.L,state(u))
+(f::DiffEqLinearOperator)(du,u,p,t) = (dy = state(du); mul!(dy,f.L,state(u)))
 
 import Base: exp
 exp(f::DiffEqLinearOperator,args...) = exp(f.L,args...)
@@ -144,6 +144,7 @@ hasaux(r1) = false
 hasaux(r1::ArrayPartition) = true
 
 _state_r1(r1) = r1
+_aux_r1(r1) = nothing
 _state_r1(r1::ArrayPartition) = r1.x[1]
 _aux_r1(r1::ArrayPartition) = r1.x[2]
 
@@ -162,23 +163,26 @@ end
 _complete_r1(r1,::Val{true},_func_cache) = (du,u,p,t) -> (dy = state(du); r1(dy,state(u),p,t))
 _complete_r1(r1,::Val{false},_func_cache) = (u,p,t) -> r1(state(u),p,t)
 _complete_r1(r1::ArrayPartition,::Val{true},_func_cache) =
-            SplitFunction((du,u,p,t) ->(dy = state(du); _state_r1(r1)(dy,state(u),p,t)),
-                          (du,u,p,t) ->(dy = aux_state(du); _aux_r1(r1)(dy,aux_state(u),p,t));
+            SplitFunction((du,u,p,t) ->(dy = state(du); dx = aux_state(du); zero_aux!(dx); _state_r1(r1)(dy,state(u),p,t)),
+                          (du,u,p,t) ->(dy = state(du); dx = aux_state(du); fill!(dy,0.0); _aux_r1(r1)(dx,aux_state(u),p,t));
                           _func_cache=deepcopy(_func_cache))
 _complete_r1(r1::ArrayPartition,::Val{false},_func_cache) =
             SplitFunction((du,u,p) ->r1.x[1](state(u),p,t),
                           (du,u,p) ->r1.x[2](aux_state(u),p,t))
 
 
-_complete_r2(r2,::Val{true},_func_cache) = (du,u,p,t) -> r2(constraint(du),p,t)
+_complete_r2(r2,::Val{true},_func_cache) = (du,u,p,t) -> (dz = constraint(du); r2(dz,p,t))
 _complete_r2(r2,::Val{false},_func_cache) = (u,p,t) -> r2(p,t)
 
 
-_complete_B1(B1,::Val{true},_func_cache) = (du,u,p,t) -> (dy = state(du); B1(dy,constraint(u),p); dy .*= -1.0)
+_complete_B1(B1,::Val{true},_func_cache) = (du,u,p,t) -> (dy = state(du); dx = aux_state(du); zero_aux!(dx); B1(dy,constraint(u),p); dy .*= -1.0)
 _complete_B1(B1,::Val{false},_func_cache) = (u,p,t) -> -B1(constraint(u),p)
 
 _complete_B2(B2,::Val{true},_func_cache) = (du,u,p,t) -> (dz = constraint(du); B2(dz,state(u),p); dz .*= -1.0)
 _complete_B2(B2,::Val{false},_func_cache) = (u,p,t) -> -B2(state(u),p)
+
+zero_aux!(::Nothing) = nothing
+zero_aux!(x) = fill!(x,0.0)
 
 function (f::ConstrainedODEFunction)(du,u,p,t)
     fill!(f.cache,0.0)

@@ -238,6 +238,7 @@ end
     ytmp, ztmp = state(utmp), constraint(utmp)
     yprev = state(uprev)
     y, z, x = state(u), constraint(u), aux_state(u)
+    main = mainvector(u)
 
     ttmp = t
     u .= uprev
@@ -260,13 +261,14 @@ end
       param_update_func(pnew,u,pold,ttmp)
       S[1] = SaddleSystem(S[1],Hhalfdt,f,pnew,pold,cache)
       _constraint_r2!(utmp,f,u,pnew,ttmp) # only updates the z part
-      mainvector(u) .= S[1]\mainvector(utmp)
+      main .= S[1]\mainvector(utmp)
       @.. udiff -= u
       numiter += 1
       err = compute_l2err(udiff)
     end
     fill!(utmp,0.0)
     ytmp .= typeof(ytmp)(S[1].A⁻¹B₁ᵀf)
+
 
     ldiv!(yprev,Hhalfdt,yprev)
     ldiv!(state(k1),Hhalfdt,state(k1))
@@ -328,6 +330,7 @@ end
     @.. z /= (dt*ã33)
 
     param_update_func(pnew,u,pold,t+dt)
+
     f.odef(integrator.fsallast, u, pnew, t+dt)
 
     recursivecopy!(p,pnew)
@@ -400,6 +403,8 @@ end
 
     param_update_func(pnew,u,p,t)
     f.odef(integrator.fsallast, u, pnew, t+dt)
+
+    #println("u = ",u)
 
     recursivecopy!(p,pnew)
 

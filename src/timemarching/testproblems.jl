@@ -141,8 +141,8 @@ end
 function partitioned_problem(;tmax=1.0)
 
   ω = 1.0
-  βu = 0.0
-  βv = 0.0
+  βu = -0.2
+  βv = -0.5
 
   par = [ω,βu,βv]
 
@@ -161,6 +161,8 @@ function partitioned_problem(;tmax=1.0)
 
   function X_rhs!(dy,y,p,t)
     fill!(dy,0.0)
+    dy[1] = p.params[2]*y[1]
+    dy[2] = p.params[3]*y[2]
     return dy
   end
 
@@ -180,6 +182,7 @@ function partitioned_problem(;tmax=1.0)
   function op_constraint_force!(dy,z,p)
     @unpack B₁ᵀ = p
     dy .= B₁ᵀ*z
+    return dy
   end
 
   function constraint_op!(dz,y,p)
@@ -191,15 +194,19 @@ function partitioned_problem(;tmax=1.0)
     x = aux_state(u)
     @unpack B₁ᵀ, B₂ = q
 
-    B₁ᵀ[1,1] = x[1]/(x[1]^2+x[2]^2)
-    B₁ᵀ[2,1] = x[2]/(x[1]^2+x[2]^2)
-    B₂[1,1] = x[1]/(x[1]^2+x[2]^2)
-    B₂[1,2] = x[2]/(x[1]^2+x[2]^2)
+    B₁ᵀ[1,1] = -sin(p.params[1]*t)
+    B₁ᵀ[2,1] = cos(p.params[1]*t)
+    B₂[1,1] = -sin(p.params[1]*t)
+    B₂[1,2] = cos(p.params[1]*t)
+    #B₁ᵀ[1,1] = x[1] #/(x[1]^2+x[2]^2)
+    #B₁ᵀ[2,1] = x[2] #/(x[1]^2+x[2]^2)
+    #B₂[1,1] = x[1] #/(x[1]^2+x[2]^2)
+    #B₂[1,2] = x[2] #/(x[1]^2+x[2]^2)
     return q
   end
 
   f = ConstrainedODEFunction(ode_rhs!,constraint_rhs!,op_constraint_force!,
-                              constraint_op!,L,_func_cache=deepcopy(du),
+                              constraint_op!,_func_cache=deepcopy(du), # removed L temporarily
                               param_update_func=update_p!)
   tspan = (0.0,tmax)
   p = deepcopy(p₀)
