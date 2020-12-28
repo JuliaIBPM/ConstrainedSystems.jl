@@ -37,6 +37,8 @@ exp(L::AbstractMatrix,t,x) = exp(factorize(L)*t)
 exp(L::UniformScaling,t,x) = exp(Diagonal(L,length(x))*t)
 
 #=
+ConstrainedODEFunction
+
 A function of this type should be able to take arguments (du,u,p,t) (for in-place)
 or (u,p,t) for out-of-place, and distribute the parts of u and du as
 needed to the component functions. u and du will both be of type ArrayPartition,
@@ -66,7 +68,7 @@ systems.
 This specifies the functions and operators that comprise an ODE problem with the form
 
 ``
-M\\dfrac{dy}{dt} = Ly - B_1 z + r_1(y,t)
+\\dfrac{dy}{dt} = Ly - B_1 z + r_1(y,t)
 ``
 
 ``
