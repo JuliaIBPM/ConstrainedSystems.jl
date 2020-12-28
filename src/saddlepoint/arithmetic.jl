@@ -48,22 +48,23 @@ end
 
 ## Multiplying tuples of saddle point systems
 
-function mul!(sol,sys::NTuple{M,SaddleSystem},rhs) where {M}
+function mul!(sol,sys::Tuple{T1,T2},rhs) where {T1<:SaddleSystem,T2<:SaddleSystem}
    for (i,sysi) in enumerate(sys)
      mul!(sol[i],sysi,rhs[i])
    end
    sol
 end
 
-
+#=
 function mul!(sol,sys::ArrayPartition{T},rhs) where {T<:SaddleSystem}
    for (i,sysi) in enumerate(sys.x)
      mul!(sol.x[i],sysi,rhs.x[i])
    end
    sol
 end
+=#
 
-function (*)(sys::Union{NTuple{M,T},ArrayPartition{T}},rhs) where {M,T<:ArrayPartition}
+function (*)(sys::Tuple{T1,T2},rhs) where {T1<:SaddleSystem,T2<:SaddleSystem}
     sol = deepcopy.(rhs)
     mul!(sol,sys,rhs)
     return sol
@@ -131,21 +132,23 @@ end
 
 ## Solving tuples of saddle point systems
 
-function ldiv!(sol,sys::NTuple{M,SaddleSystem},rhs) where {M}
+function ldiv!(sol,sys::Tuple{T1,T2},rhs) where {T1<:SaddleSystem,T2<:SaddleSystem}
    for (i,sysi) in enumerate(sys)
      ldiv!(sol[i],sysi,rhs[i])
    end
    sol
 end
 
+#=
 function ldiv!(sol,sys::ArrayPartition{T},rhs) where {M,T<:SaddleSystem}
    for (i,sysi) in enumerate(sys.x)
      ldiv!(sol.x[i],sysi,rhs.x[i])
    end
    sol
 end
+=#
 
-function (\)(sys::Union{NTuple{M,T},ArrayPartition{T}},rhs) where {M,T<:SaddleSystem}
+function (\)(sys::Tuple{T1,T2},rhs) where {T1<:SaddleSystem,T2<:SaddleSystem}
     sol = deepcopy.(rhs)
     ldiv!(sol,sys,rhs)
     return sol

@@ -18,7 +18,6 @@ _solvector(s,c,aux) = ArrayPartition(s,c,aux)
 
 
 mainvector(u) = u
-#mainvector(u::ArrayPartition{T,Tuple{A,F}}) where {T,A<:ArrayPartition,F} = u.x[1]
 mainvector(u::ArrayPartition) = ArrayPartition(u.x[1],u.x[2])
 
 
