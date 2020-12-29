@@ -1,6 +1,10 @@
 export DiffEqLinearOperator, ConstrainedODEFunction
 
 
+DEFAULT_PARAM_UPDATE_FUNC(q,u,p,t) = q
+DEFAULT_PARAM_UPDATE_FUNC(u,p,t) = p
+
+
 ### Abstract algorithms ###
 abstract type ConstrainedOrdinaryDiffEqAlgorithm <: OrdinaryDiffEq.OrdinaryDiffEqAlgorithm end
 
@@ -15,7 +19,7 @@ abstract type ConstrainedODEConstantCache{sc,solverType} <: OrdinaryDiffEqConsta
 
 mutable struct DiffEqLinearOperator{T,aType} <: AbstractDiffEqLinearOperator{T}
     L :: aType
-    DiffEqLinearOperator(L::aType; update_func=DEFAULT_UPDATE_FUNC,
+    DiffEqLinearOperator(L::aType; update_func=DEFAULT_PARAM_UPDATE_FUNC,
                           dtype=Float64) where {aType} = new{dtype,aType}(L)
 end
 
@@ -115,7 +119,7 @@ struct ConstrainedODEFunction{iip,static,F1,F2,TMM,C,Ta,Tt,TJ,JVP,VJP,JP,SP,TW,T
 end
 
 function ConstrainedODEFunction(r1,r2,B1,B2,L=DiffEqLinearOperator(0*I);
-                                                 param_update_func = DEFAULT_UPDATE_FUNC,
+                                                 param_update_func = DEFAULT_PARAM_UPDATE_FUNC,
                                                  mass_matrix=I,_func_cache=nothing,
                                                  analytic=nothing,
                                                  tgrad = nothing,
@@ -132,29 +136,38 @@ function ConstrainedODEFunction(r1,r2,B1,B2,L=DiffEqLinearOperator(0*I);
 
 
 
-    allinplace(r1,r2,B1,B2) || alloutofplace(r1,r2,B1,B2) || error("Inconsistent function signatures")
+    allempty(r2,B1,B2) || noneempty(r2,B1,B2) || error("Inconsistent null operators")
+    unconstrained = allempty(r2,B1,B2)
 
+    allinplace(r1,r2,B1,B2) || alloutofplace(r1,r2,B1,B2) || error("Inconsistent function signatures")
     iip = allinplace(r1,r2,B1,B2)
-    static = param_update_func == DEFAULT_UPDATE_FUNC ? true : false
+
+    static = param_update_func == DEFAULT_PARAM_UPDATE_FUNC ? true : false
+
 
     L_local = (L isa DiffEqLinearOperator) ? L : DiffEqLinearOperator(L)
 
-    zero_vec!(_func_cache)
-    odef_nl = SplitFunction(_complete_r1(r1,_func_cache=_func_cache),
-                            _complete_B1(B1);_func_cache=deepcopy(_func_cache))
-    odef = SplitFunction(L_local, odef_nl ;_func_cache=deepcopy(_func_cache))
-    conf = SplitFunction(_complete_r2(r2),_complete_B2(B2);_func_cache=deepcopy(_func_cache))
+    local_cache = deepcopy(_func_cache)
+    zero_vec!(local_cache)
 
+    odef_nl = SplitFunction(_complete_r1(r1,Val(iip),_func_cache=local_cache),
+                            _complete_B1(B1,Val(iip));_func_cache=deepcopy(local_cache))
+    odef = SplitFunction(L_local, odef_nl ;_func_cache=deepcopy(local_cache))
+    conf = SplitFunction(_complete_r2(r2,Val(iip)),_complete_B2(B2,Val(iip));_func_cache=deepcopy(local_cache))
 
     ConstrainedODEFunction{iip,static,typeof(odef),
-                           typeof(conf),typeof(mass_matrix),typeof(_func_cache),
+                           typeof(conf),typeof(mass_matrix),typeof(local_cache),
                            typeof(analytic),typeof(tgrad),typeof(jac),typeof(jvp),typeof(vjp),
                            typeof(jac_prototype),typeof(sparsity),
                            typeof(Wfact),typeof(Wfact_t),typeof(paramjac),typeof(syms),
-                           typeof(colorvec),typeof(param_update_func)}(odef,conf,mass_matrix,_func_cache,
+                           typeof(colorvec),typeof(param_update_func)}(odef,conf,mass_matrix,local_cache,
                            analytic,tgrad,jac,jvp,vjp,jac_prototype,
                            sparsity,Wfact,Wfact_t,paramjac,syms,colorvec,param_update_func)
 end
+
+# For unconstrained systems
+ConstrainedODEFunction(r1,L=DiffEqLinearOperator(0*I);kwargs...) =
+      ConstrainedODEFunction(r1,nothing,nothing,nothing,L;kwargs...)
 
 function Base.show(io::IO, m::MIME"text/plain",f::ConstrainedODEFunction{iip,static}) where {iip,static}
     iips = iip ? "in-place" : "out-of-place"
@@ -177,19 +190,29 @@ for fcn in (:_ode_L,:_ode_r1,:_ode_neg_B1,:_constraint_neg_B2,:_constraint_r2)
   @eval $fcn(f::ConstrainedODEFunction,u,p,t) = $fetchfcn(f)(u,p,t)
 end
 
+allempty(::Nothing,::Nothing,::Nothing) = true
+allempty(r2,B1,B2) = false
+noneempty(r2,B1,B2) = !(isnothing(r2) || isnothing(B1) || isnothing(B2))
+
+
 allinplace(r1,r2,B1,B2) = _isinplace_r1(r1) && _isinplace_r2(r2) && _isinplace_B1(B1) && _isinplace_B2(B2)
 alloutofplace(r1,r2,B1,B2) = _isoop_r1(r1) && _isoop_r2(r2) && _isoop_B1(B1) && _isoop_B2(B2)
+
+allinplace(r1,::Nothing,::Nothing,::Nothing) = _isinplace_r1(r1)
+alloutofplace(r1,::Nothing,::Nothing,::Nothing) = _isoop_r1(r1)
+
 
 
 for (f,nv) in ((:r1,4),(:r2,3),(:B1,3),(:B2,3))
   iipfcn = Symbol("_isinplace_",string(f))
   oopfcn = Symbol("_isoop_",string(f))
   completefcn = Symbol("_complete_",string(f))
-  @eval $iipfcn($f) = isinplace($f,$nv)
-  @eval $iipfcn($f::ArrayPartition) = all(($iipfcn(x) for x in $f.x))
-  @eval $oopfcn($f) = numargs($f) == $(nv-1)
-  @eval $oopfcn($f::ArrayPartition) = all(($oopfcn(x) for x in $f.x))
-  @eval $completefcn($f;_func_cache=nothing) = $completefcn($f,Val($iipfcn($f)),_func_cache)
+  @eval $iipfcn(fcn) = isinplace(fcn,$nv)
+  @eval $iipfcn(fcn::ArrayPartition) = all(($iipfcn(x) for x in fcn.x))
+  @eval $oopfcn(fcn) = numargs(fcn) == $(nv-1)
+  @eval $oopfcn(fcn::ArrayPartition) = all(($oopfcn(x) for x in fcn.x))
+  @eval $completefcn(fcn,::Val{iip};_func_cache=nothing) where {iip} = $completefcn(fcn,Val(iip),_func_cache)
+  @eval $completefcn(::Nothing,::Val{false},_func_cache) = (u,p,t) -> zero(u)
 end
 
 _complete_r1(r1,::Val{true},_func_cache) = (du,u,p,t) -> (dy = state(du); r1(dy,state(u),p,t))
@@ -204,12 +227,16 @@ _complete_r1(r1::ArrayPartition,::Val{false},_func_cache) =
 
 
 _complete_r2(r2,::Val{true},_func_cache) = (du,u,p,t) -> (dz = constraint(du); r2(dz,p,t))
+_complete_r2(::Nothing,::Val{true},_func_cache) = (du,u,p,t) -> zero_vec!(constraint(du))
 _complete_r2(r2,::Val{false},_func_cache) = (u,p,t) -> (du = deepcopy(u); zero_vec!(du); constraint(du) .= r2(p,t); return du)
 
+
 _complete_B1(B1,::Val{true},_func_cache) = (du,u,p,t) -> (dy = state(du); dx = aux_state(du); zero_vec!(dx); B1(dy,constraint(u),p); dy .*= -1.0)
+_complete_B1(::Nothing,::Val{true},_func_cache) = (du,u,p,t) -> (zero_vec!(aux_state(du)); zero_vec!(state(du)))
 _complete_B1(B1,::Val{false},_func_cache) = (u,p,t) -> (du = deepcopy(u); zero_vec!(du); state(du) .= -B1(constraint(u),p); return du)
 
 _complete_B2(B2,::Val{true},_func_cache) = (du,u,p,t) -> (dz = constraint(du); B2(dz,state(u),p); dz .*= -1.0)
+_complete_B2(::Nothing,::Val{true},_func_cache) = (du,u,p,t) -> zero_vec!(constraint(du))
 _complete_B2(B2,::Val{false},_func_cache) = (u,p,t) -> (du = deepcopy(u); zero_vec!(du); constraint(du) .= -B2(state(u),p); return du)
 
 function (f::ConstrainedODEFunction)(du,u,p,t)
@@ -223,4 +250,4 @@ end
 (f::ConstrainedODEFunction)(u,p,t) = f.odef(u,p,t) + f.conf(u,p,t)
 
 
-@inline isstatic(f::ConstrainedODEFunction) = f.param_update_func == DEFAULT_UPDATE_FUNC ? true : false
+@inline isstatic(f::ConstrainedODEFunction) = f.param_update_func == DEFAULT_PARAM_UPDATE_FUNC ? true : false

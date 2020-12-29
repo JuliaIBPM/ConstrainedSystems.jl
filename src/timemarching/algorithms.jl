@@ -75,7 +75,7 @@ LiskaIFHERKCache{sc,ni,solverType}(u,uprev,k1,k2,k3,utmp,udiff,dutmp,fsalfirst,
 function alg_cache(alg::LiskaIFHERK{solverType},u,rate_prototype,uEltypeNoUnits,uBottomEltypeNoUnits,
                    tTypeNoUnits,uprev,uprev2,f,t,dt,reltol,p,calck,::Val{true}) where {solverType}
 
-  typeof(u) <: ArrayPartition || error("u must be of type ArrayPartition")
+  u isa ArrayPartition || error("u must be of type ArrayPartition")
 
   y, z = state(u), constraint(u)
 
@@ -141,7 +141,7 @@ IFHEEulerCache{sc,ni,solverType}(u,uprev,k1,utmp,udiff,dutmp,fsalfirst,
 function alg_cache(alg::IFHEEuler{solverType},u,rate_prototype,uEltypeNoUnits,uBottomEltypeNoUnits,
                    tTypeNoUnits,uprev,uprev2,f,t,dt,reltol,p,calck,::Val{true}) where {solverType}
 
-  typeof(u) <: ArrayPartition || error("u must be of type ArrayPartition")
+  u isa ArrayPartition || error("u must be of type ArrayPartition")
 
   y, z = state(u), constraint(u)
 
@@ -213,11 +213,12 @@ end
     @.. utmp = uprev + k1
     ttmp = t + dt*c̃1
 
+    u .= utmp
+
     # if applicable, update p, construct new saddle system here, using Hhalfdt
     # and solve system. Solve iteratively if saddle operators depend on
     # constrained part of the state.
     err, numiter = init_err, init_iter
-    u .= utmp # initial guess for iterations
     while err > tol && numiter <= maxiter
       udiff .= u
       param_update_func(pnew_ptr,u,pold_ptr,ttmp)
@@ -245,9 +246,10 @@ end
     @.. utmp = uprev + k2 + dt*ã21*k1
     ttmp = t + dt*c̃2
 
+    u .= utmp
+
     # if applicable, update p, construct new saddle system here, using Hhalfdt
     err, numiter = init_err, init_iter
-    u .= utmp
     while err > tol && numiter <= maxiter
       udiff .= u
       param_update_func(pnew_ptr,u,pold_ptr,ttmp)
@@ -276,9 +278,10 @@ end
     @.. utmp = uprev + k3 + dt*ã32*k2 + dt*ã31*k1
     ttmp = t + dt
 
+    u .= utmp
+
     # if applicable, update p, construct new saddle system here, using Hzero (identity)
     err, numiter = init_err, init_iter
-    u .= utmp
     while err > tol && numiter <= maxiter
       udiff .= u
       param_update_func(pnew_ptr,u,pold_ptr,ttmp)

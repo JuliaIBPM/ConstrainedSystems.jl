@@ -23,6 +23,10 @@ macro cache(expr)
   end
 end
 
+# Need to allow UNITLESS_ABS2 to work on empty vectors
+import OrdinaryDiffEq.DiffEqBase: UNITLESS_ABS2
+@inline UNITLESS_ABS2(x::AbstractArray) = (isempty(x) && return sum(UNITLESS_ABS2,zero(eltype(x))); sum(UNITLESS_ABS2, x))
+
 zero_vec!(::Nothing) = nothing
 zero_vec!(x) = fill!(x,0.0)
 
