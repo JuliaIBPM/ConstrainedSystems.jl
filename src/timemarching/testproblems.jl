@@ -31,6 +31,35 @@ function basic_unconstrained_problem(;tmax=1.0,iip=true)
 
 end
 
+function basic_unconstrained_if_problem(;tmax=1.0,iip=true)
+
+  ns = 1
+  y0 = 1.0
+  α = 1.02
+  p = α
+
+  ode_rhs!(dy,y,p,t) = fill!(dy,0.0)
+  ode_rhs(y,p,t) = zero(y)
+
+  L = α*I
+
+  y₀ = ones(Float64,ns)
+  u₀ = solvector(state=y₀)
+
+  if iip
+    f = ConstrainedODEFunction(ode_rhs!,L,_func_cache=u₀)
+  else
+    f = ConstrainedODEFunction(ode_rhs,L)
+  end
+  tspan = (0.0,1.0)
+  prob = ODEProblem(f,u₀,tspan,p)
+
+  xexact(t) = exp(α*t)
+
+  return prob, xexact
+
+end
+
 
 function basic_constrained_problem(;tmax=1.0,iip=true)
 
