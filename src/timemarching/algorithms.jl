@@ -36,8 +36,7 @@ end
   Hhalfdt::expType1
   Hzero::expType2
   S::saddleType
-  pnew::pType
-  pold::pType
+  ptmp::pType
   k::rateType
   tab::TabType
 end
@@ -68,10 +67,10 @@ struct LiskaIFHERKConstantCache{sc,ni,solverType,T,T2} <: ConstrainedODEConstant
 end
 
 LiskaIFHERKCache{sc,ni,solverType}(u,uprev,k1,k2,k3,utmp,udiff,dutmp,fsalfirst,
-                                Hhalfdt,Hzero,S,pnew,pold,k,tab) where {sc,ni,solverType} =
+                                Hhalfdt,Hzero,S,ptmp,k,tab) where {sc,ni,solverType} =
         LiskaIFHERKCache{sc,ni,solverType,typeof(u),typeof(k1),typeof(Hhalfdt),typeof(Hzero),
-                        typeof(S),typeof(pnew),typeof(tab)}(u,uprev,k1,k2,k3,utmp,udiff,dutmp,fsalfirst,
-                                                          Hhalfdt,Hzero,S,pnew,pold,k,tab)
+                        typeof(S),typeof(ptmp),typeof(tab)}(u,uprev,k1,k2,k3,utmp,udiff,dutmp,fsalfirst,
+                                                          Hhalfdt,Hzero,S,ptmp,k,tab)
 
 function alg_cache(alg::LiskaIFHERK{solverType},u,rate_prototype,uEltypeNoUnits,uBottomEltypeNoUnits,
                    tTypeNoUnits,uprev,uprev2,f,t,dt,reltol,p,calck,::Val{true}) where {solverType}
@@ -99,7 +98,7 @@ function alg_cache(alg::LiskaIFHERK{solverType},u,rate_prototype,uEltypeNoUnits,
 
 
   LiskaIFHERKCache{sc,ni,solverType}(u,uprev,k1,k2,k3,utmp,udiff,dutmp,fsalfirst,
-                                  Hhalfdt,Hzero,S,deepcopy(p),deepcopy(p),k,tab)
+                                  Hhalfdt,Hzero,S,deepcopy(p),k,tab)
 end
 
 function alg_cache(alg::LiskaIFHERK{solverType},u,rate_prototype,
@@ -125,8 +124,7 @@ end
   fsalfirst::rateType
   Hdt::expType
   S::saddleType
-  pnew::pType
-  pold::pType
+  ptmp::pType
   k::rateType
 end
 
@@ -135,10 +133,10 @@ struct IFHEEulerConstantCache{sc,ni,solverType} <: ConstrainedODEConstantCache{s
 end
 
 IFHEEulerCache{sc,ni,solverType}(u,uprev,k1,utmp,udiff,dutmp,fsalfirst,
-                                Hdt,S,pnew,pold,k) where {sc,ni,solverType} =
+                                Hdt,S,ptmp,k) where {sc,ni,solverType} =
         IFHEEulerCache{sc,ni,solverType,typeof(u),typeof(k1),typeof(Hdt),
-                        typeof(S),typeof(pnew)}(u,uprev,k1,utmp,udiff,dutmp,fsalfirst,
-                                                              Hdt,S,pnew,pold,k)
+                        typeof(S),typeof(ptmp)}(u,uprev,k1,utmp,udiff,dutmp,fsalfirst,
+                                                              Hdt,S,ptmp,k)
 
 function alg_cache(alg::IFHEEuler{solverType},u,rate_prototype,uEltypeNoUnits,uBottomEltypeNoUnits,
                    tTypeNoUnits,uprev,uprev2,f,t,dt,reltol,p,calck,::Val{true}) where {solverType}
@@ -159,7 +157,7 @@ function alg_cache(alg::IFHEEuler{solverType},u,rate_prototype,uEltypeNoUnits,uB
   push!(S,SaddleSystem(Hdt,f,p,p,dutmp,solverType))
 
   IFHEEulerCache{sc,ni,solverType}(u,uprev,k1,utmp,udiff,dutmp,fsalfirst,
-                                  Hdt,S,deepcopy(p),deepcopy(p),k)
+                                  Hdt,S,deepcopy(p),k)
 end
 
 function alg_cache(alg::IFHEEuler{solverType},u,rate_prototype,
@@ -191,7 +189,7 @@ end
 @muladd function perform_step!(integrator,cache::LiskaIFHERKCache{sc,ni,solverType},repeat_step=false) where {sc,ni,solverType}
     @unpack t,dt,uprev,u,f,p,alg = integrator
     @unpack maxiter, tol = alg
-    @unpack k1,k2,k3,utmp,udiff,dutmp,fsalfirst,Hhalfdt,Hzero,S,pnew,pold,k = cache
+    @unpack k1,k2,k3,utmp,udiff,dutmp,fsalfirst,Hhalfdt,Hzero,S,ptmp,k = cache
     @unpack ã11,ã21,ã22,ã31,ã32,ã33,c̃1,c̃2,c̃3 = cache.tab
     @unpack param_update_func = f
 
@@ -203,7 +201,7 @@ end
     yprev = state(uprev)
     y, z, x = state(u), constraint(u), aux_state(u)
     pold_ptr = p
-    pnew_ptr = pnew
+    pnew_ptr = ptmp
 
     ttmp = t
     u .= uprev
@@ -232,7 +230,7 @@ end
     end
     zero_vec!(xtmp)
     B1_times_z!(utmp,S[1])
-    pold_ptr = pnew
+    pold_ptr = ptmp
     pnew_ptr = p
 
     ldiv!(yprev,Hhalfdt,yprev)
@@ -263,7 +261,7 @@ end
     zero_vec!(xtmp)
     B1_times_z!(utmp,S[1])
     pold_ptr = p
-    pnew_ptr = pnew
+    pnew_ptr = ptmp
 
     ldiv!(yprev,Hhalfdt,yprev)
     ldiv!(state(k1),Hhalfdt,state(k1))
@@ -295,7 +293,7 @@ end
     @.. z /= (dt*ã33)
 
     # Final steps
-    param_update_func(p,u,pnew,t+dt)
+    param_update_func(p,u,ptmp,t+dt)
     f.odef(integrator.fsallast, u, p, t+dt)
     integrator.destats.nf += 1
 
@@ -328,15 +326,15 @@ end
     yprev = state(uprev)
     udiff = deepcopy(uprev)
     ducache = deepcopy(uprev)
-    pnew = deepcopy(p)
+    ptmp = deepcopy(p)
     L = _fetch_ode_L(f)
     Hhalfdt = exp(L,-dt/2,state(uprev))
     Hzero = exp(L,zero(dt),state(uprev))
-
+    pold_ptr = p
 
     ## Stage 1
     ttmp = t
-    k1 = _ode_r1(f,uprev,pnew,ttmp)
+    k1 = _ode_r1(f,uprev,pold_ptr,ttmp)
     integrator.destats.nf += 1
     @.. k1 *= dt*ã11
     utmp = @.. uprev + k1
@@ -345,14 +343,14 @@ end
     # if applicable, update p, construct new saddle system here, using Hhalfdt
     # and solve system. Solve iteratively if saddle operators depend on
     # constrained part of the state.
-    pold = deepcopy(pnew)
     err, numiter = init_err, init_iter
     u = deepcopy(utmp)
     while err > tol && numiter <= maxiter
       udiff .= u
-      pnew = param_update_func(u,pold,ttmp)
-      S = SaddleSystem(Hhalfdt,f,pnew,pold,ducache,solverType)
-      constraint(utmp) .= constraint(_constraint_r2(f,u,pnew,ttmp))
+      ptmp = param_update_func(u,pold_ptr,ttmp)
+      pnew_ptr = ptmp
+      S = SaddleSystem(Hhalfdt,f,pnew_ptr,pold_ptr,ducache,solverType)
+      constraint(utmp) .= constraint(_constraint_r2(f,u,pnew_ptr,ttmp))
       mainvector(u) .= S\mainvector(utmp)
       B1_times_z!(ducache,S)
 
@@ -362,7 +360,7 @@ end
     end
     zero_vec!(aux_state(utmp))
     state(utmp) .= state(ducache)
-
+    pold_ptr = ptmp
 
     ldiv!(yprev,Hhalfdt,yprev)
     ldiv!(state(k1),Hhalfdt,state(k1))
@@ -370,21 +368,20 @@ end
     @.. k1 = (k1-utmp)/(dt*ã11)  # r1(y,t) - B1T*z
 
     ## Stage 2
-    k2 = _ode_r1(f,u,pnew,ttmp)
+    k2 = _ode_r1(f,u,pold_ptr,ttmp)
     integrator.destats.nf += 1
     @.. k2 *= dt*ã22
     @.. utmp = uprev + k2 + dt*ã21*k1
     ttmp = t + dt*c̃2
 
     # if applicable, update p, construct new saddle system here, using Hhalfdt
-    pold = deepcopy(pnew)
     err, numiter = init_err, init_iter
     u .= utmp
     while err > tol && numiter <= maxiter
       udiff .= u
-      pnew = param_update_func(u,pold,ttmp)
-      S = SaddleSystem(Hhalfdt,f,pnew,pold,ducache,solverType)
-      constraint(utmp) .= constraint(_constraint_r2(f,u,pnew,ttmp))
+      ptmp = param_update_func(u,pold_ptr,ttmp)
+      S = SaddleSystem(Hhalfdt,f,ptmp,pold_ptr,ducache,solverType)
+      constraint(utmp) .= constraint(_constraint_r2(f,u,ptmp,ttmp))
       mainvector(u) .= S\mainvector(utmp)
       B1_times_z!(ducache,S)
       @.. udiff -= u
@@ -393,6 +390,7 @@ end
     end
     zero_vec!(aux_state(utmp))
     state(utmp) .= state(ducache)
+    pold_ptr = ptmp
 
     ldiv!(yprev,Hhalfdt,yprev)
     ldiv!(state(k1),Hhalfdt,state(k1))
@@ -401,21 +399,20 @@ end
     @.. k2 = (k2-utmp)/(dt*ã22)
 
     ## Stage 3
-    k3 = _ode_r1(f,u,pnew,ttmp)
+    k3 = _ode_r1(f,u,pold_ptr,ttmp)
     integrator.destats.nf += 1
     @.. k3 *= dt*ã33
     @.. utmp = uprev + k3 + dt*ã32*k2 + dt*ã31*k1
     ttmp = t + dt
 
     # if applicable, update p, construct new saddle system here, using Hzero (identity)
-    pold = deepcopy(pnew)
     err, numiter = init_err, init_iter
     u .= utmp
     while err > tol && numiter <= maxiter
       udiff .= u
-      pnew = param_update_func(u,pold,ttmp)
-      S = SaddleSystem(Hzero,f,pnew,pold,ducache,solverType)
-      constraint(utmp) .= constraint(_constraint_r2(f,u,pnew,ttmp))
+      ptmp = param_update_func(u,pold_ptr,ttmp)
+      S = SaddleSystem(Hzero,f,ptmp,pold_ptr,ducache,solverType)
+      constraint(utmp) .= constraint(_constraint_r2(f,u,ptmp,ttmp))
       mainvector(u) .= S\mainvector(utmp)
       @.. udiff -= u
       numiter += 1
@@ -425,10 +422,9 @@ end
     @.. constraint(u) /= (dt*ã33)
 
     # Final steps
-    pnew = param_update_func(u,p,t)
-    k = f.odef(u, pnew, t+dt)
+    integrator.p = param_update_func(u,ptmp,t)
+    k = f.odef(u, integrator.p, t+dt)
     integrator.destats.nf += 1
-    recursivecopy!(p,pnew)
 
     integrator.fsallast = k
     integrator.k[1] = integrator.fsalfirst
@@ -457,7 +453,7 @@ end
 
 @muladd function perform_step!(integrator,cache::IFHEEulerCache{sc,ni,solverType},repeat_step=false) where {sc,ni,solverType}
     @unpack t,dt,uprev,u,f,p,alg = integrator
-    @unpack k1,utmp,udiff,dutmp,fsalfirst,Hdt,S,pnew,pold,k = cache
+    @unpack k1,utmp,udiff,dutmp,fsalfirst,Hdt,S,ptmp,k = cache
     @unpack maxiter, tol = alg
     @unpack param_update_func = f
 
@@ -468,7 +464,7 @@ end
     ytmp, ztmp = state(utmp), constraint(utmp)
     z = constraint(u)
     pold_ptr = p
-    pnew_ptr = pnew
+    pnew_ptr = ptmp
 
     ttmp = t
     u .= uprev
@@ -480,7 +476,6 @@ end
     ttmp = t + dt
 
     # if applicable, update p, construct new saddle system here, using Hdt
-    #recursivecopy!(pold,pnew)
     err, numiter = init_err, init_iter
     u .= utmp
     while err > tol && numiter <= maxiter
@@ -529,25 +524,25 @@ end
   # set up some cache variables
   udiff = deepcopy(uprev)
   ducache = deepcopy(uprev)
-  pnew = deepcopy(p)
+  ptmp = deepcopy(p)
   L = _fetch_ode_L(f)
   Hdt = exp(L,-dt,state(uprev))
+  pold_ptr = p
+  pnew_ptr = ptmp
 
-
-  k1 = _ode_r1(f,uprev,pnew,t)
+  k1 = _ode_r1(f,uprev,pold_ptr,t)
   integrator.destats.nf += 1
   @.. k1 *= dt
   utmp = @.. uprev + k1
 
   # if applicable, update p, construct new saddle system here, using Hdt
-  pold = deepcopy(pnew)
   err, numiter = init_err, init_iter
   u = deepcopy(utmp)
   while err > tol && numiter <= maxiter
     udiff .= u
-    pnew = param_update_func(u,pold,t+dt)
-    S = SaddleSystem(Hdt,f,pnew,pold,ducache,solverType)
-    constraint(utmp) .= constraint(_constraint_r2(f,u,pnew,t+dt))
+    pnew_ptr = param_update_func(u,pold_ptr,t+dt)
+    S = SaddleSystem(Hdt,f,pnew_ptr,pold_ptr,ducache,solverType)
+    constraint(utmp) .= constraint(_constraint_r2(f,u,pnew_ptr,t+dt))
     mainvector(u) .= S\mainvector(utmp)
     @.. udiff -= u
     numiter += 1
@@ -557,10 +552,9 @@ end
   @.. constraint(u) /= dt
 
   # Final steps
-  pnew = param_update_func(u,p,t)
-  k = f.odef(u, pnew, t+dt)
+  integrator.p = param_update_func(u,pold_ptr,t)
+  k = f.odef(u, integrator.p, t+dt)
   integrator.destats.nf += 1
-  recursivecopy!(p,pnew)
 
   integrator.fsallast = k
   integrator.k[1] = integrator.fsalfirst
