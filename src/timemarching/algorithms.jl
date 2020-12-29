@@ -458,7 +458,8 @@ end
     @unpack param_update_func = f
 
     init_err = float(1)
-    init_iter = ni ? 1 : maxiter
+    #init_iter = ni ? 1 : maxiter
+    init_iter = maxiter  # First-order method does not need iteration
 
     # aliases to the state and constraint parts
     ytmp, ztmp = state(utmp), constraint(utmp)
@@ -519,7 +520,9 @@ end
   @unpack param_update_func = f
 
   init_err = float(1)
-  init_iter = ni ? 1 : maxiter
+  #init_iter = ni ? 1 : maxiter
+  init_iter = maxiter  # First-order method does not need iteration
+
 
   # set up some cache variables
   udiff = deepcopy(uprev)
