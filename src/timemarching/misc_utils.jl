@@ -24,8 +24,19 @@ macro cache(expr)
 end
 
 # Need to allow UNITLESS_ABS2 to work on empty vectors
-import OrdinaryDiffEq.DiffEqBase: UNITLESS_ABS2
-@inline UNITLESS_ABS2(x::AbstractArray) = (isempty(x) && return sum(UNITLESS_ABS2,zero(eltype(x))); sum(UNITLESS_ABS2, x))
+# Should add this into DiffEqBase
+#@inline UNITLESS_ABS2(x::AbstractArray) = (isempty(x) && return sum(UNITLESS_ABS2,zero(eltype(x))); sum(UNITLESS_ABS2, x))
+
+# A workaround that avoids redefinition
+import OrdinaryDiffEq.DiffEqBase: UNITLESS_ABS2, ODE_DEFAULT_NORM, recursive_length
+@inline MY_UNITLESS_ABS2(x::Number) = abs2(x)
+@inline MY_UNITLESS_ABS2(x::AbstractArray) = (isempty(x) && return sum(MY_UNITLESS_ABS2,zero(eltype(x))); sum(MY_UNITLESS_ABS2, x))
+@inline MY_UNITLESS_ABS2(x::ArrayPartition) = sum(MY_UNITLESS_ABS2, x.x)
+
+
+@inline ODE_DEFAULT_NORM(u::ArrayPartition,t) = sqrt(MY_UNITLESS_ABS2(u)/recursive_length(u))
+
+
 
 zero_vec!(::Nothing) = nothing
 zero_vec!(x) = fill!(x,0.0)
