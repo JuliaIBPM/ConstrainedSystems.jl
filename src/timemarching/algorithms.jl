@@ -202,13 +202,14 @@ end
     ytmp, ztmp, xtmp = state(utmp), constraint(utmp), aux_state(utmp)
     yprev = state(uprev)
     y, z, x = state(u), constraint(u), aux_state(u)
+    pold_ptr = p
+    pnew_ptr = pnew
 
     ttmp = t
     u .= uprev
-    recursivecopy!(pnew,p)
 
     ## Stage 1
-    _ode_r1!(k1,f,u,pnew,ttmp)
+    _ode_r1!(k1,f,u,pold_ptr,ttmp)
     integrator.destats.nf += 1
     @.. k1 *= dt*ã11
     @.. utmp = uprev + k1
@@ -217,14 +218,13 @@ end
     # if applicable, update p, construct new saddle system here, using Hhalfdt
     # and solve system. Solve iteratively if saddle operators depend on
     # constrained part of the state.
-    recursivecopy!(pold,pnew)
     err, numiter = init_err, init_iter
     u .= utmp # initial guess for iterations
     while err > tol && numiter <= maxiter
       udiff .= u
-      param_update_func(pnew,u,pold,ttmp)
-      S[1] = SaddleSystem(S[1],Hhalfdt,f,pnew,pold,cache)
-      _constraint_r2!(utmp,f,u,pnew,ttmp) # only updates the z part
+      param_update_func(pnew_ptr,u,pold_ptr,ttmp)
+      S[1] = SaddleSystem(S[1],Hhalfdt,f,pnew_ptr,pold_ptr,cache)
+      _constraint_r2!(utmp,f,u,pnew_ptr,ttmp) # only updates the z part
       mainvector(u) .= S[1]\mainvector(utmp)
       @.. udiff -= u
       numiter += 1
@@ -232,6 +232,8 @@ end
     end
     zero_vec!(xtmp)
     B1_times_z!(utmp,S[1])
+    pold_ptr = pnew
+    pnew_ptr = p
 
     ldiv!(yprev,Hhalfdt,yprev)
     ldiv!(state(k1),Hhalfdt,state(k1))
@@ -239,21 +241,20 @@ end
     @.. k1 = (k1-utmp)/(dt*ã11)  # r1(y,t) - B1T*z
 
     ## Stage 2
-    _ode_r1!(k2,f,u,pnew,ttmp)
+    _ode_r1!(k2,f,u,pold_ptr,ttmp)
     integrator.destats.nf += 1
     @.. k2 *= dt*ã22
     @.. utmp = uprev + k2 + dt*ã21*k1
     ttmp = t + dt*c̃2
 
     # if applicable, update p, construct new saddle system here, using Hhalfdt
-    recursivecopy!(pold,pnew)
     err, numiter = init_err, init_iter
     u .= utmp
     while err > tol && numiter <= maxiter
       udiff .= u
-      param_update_func(pnew,u,pold,ttmp)
-      S[1] = SaddleSystem(S[1],Hhalfdt,f,pnew,pold,cache)
-      _constraint_r2!(utmp,f,u,pnew,ttmp)
+      param_update_func(pnew_ptr,u,pold_ptr,ttmp)
+      S[1] = SaddleSystem(S[1],Hhalfdt,f,pnew_ptr,pold_ptr,cache)
+      _constraint_r2!(utmp,f,u,pnew_ptr,ttmp)
       mainvector(u) .= S[1]\mainvector(utmp)
       @.. udiff -= u
       numiter += 1
@@ -261,6 +262,8 @@ end
     end
     zero_vec!(xtmp)
     B1_times_z!(utmp,S[1])
+    pold_ptr = p
+    pnew_ptr = pnew
 
     ldiv!(yprev,Hhalfdt,yprev)
     ldiv!(state(k1),Hhalfdt,state(k1))
@@ -269,21 +272,20 @@ end
     @.. k2 = (k2-utmp)/(dt*ã22)
 
     ## Stage 3
-    _ode_r1!(k3,f,u,pnew,ttmp)
+    _ode_r1!(k3,f,u,pold_ptr,ttmp)
     integrator.destats.nf += 1
     @.. k3 *= dt*ã33
     @.. utmp = uprev + k3 + dt*ã32*k2 + dt*ã31*k1
     ttmp = t + dt
 
     # if applicable, update p, construct new saddle system here, using Hzero (identity)
-    recursivecopy!(pold,pnew)
     err, numiter = init_err, init_iter
     u .= utmp
     while err > tol && numiter <= maxiter
       udiff .= u
-      param_update_func(pnew,u,pold,ttmp)
-      S[2] = SaddleSystem(S[2],Hzero,f,pnew,pold,cache)
-      _constraint_r2!(utmp,f,u,pnew,t+dt)
+      param_update_func(pnew_ptr,u,pold_ptr,ttmp)
+      S[2] = SaddleSystem(S[2],Hzero,f,pnew_ptr,pold_ptr,cache)
+      _constraint_r2!(utmp,f,u,pnew_ptr,t+dt)
       mainvector(u) .= S[2]\mainvector(utmp)
       @.. udiff -= u
       numiter += 1
@@ -293,10 +295,9 @@ end
     @.. z /= (dt*ã33)
 
     # Final steps
-    param_update_func(pnew,u,pold,t+dt)
-    f.odef(integrator.fsallast, u, pnew, t+dt)
+    param_update_func(p,u,pnew,t+dt)
+    f.odef(integrator.fsallast, u, p, t+dt)
     integrator.destats.nf += 1
-    recursivecopy!(p,pnew)
 
     return nothing
 end
@@ -466,26 +467,27 @@ end
     # aliases to the state and constraint parts
     ytmp, ztmp = state(utmp), constraint(utmp)
     z = constraint(u)
+    pold_ptr = p
+    pnew_ptr = pnew
 
     ttmp = t
     u .= uprev
-    recursivecopy!(pnew,p)
 
-    _ode_r1!(k1,f,u,pnew,ttmp)
+    _ode_r1!(k1,f,u,pold_ptr,ttmp)
     integrator.destats.nf += 1
     @.. k1 *= dt
     @.. utmp = uprev + k1
     ttmp = t + dt
 
     # if applicable, update p, construct new saddle system here, using Hdt
-    recursivecopy!(pold,pnew)
+    #recursivecopy!(pold,pnew)
     err, numiter = init_err, init_iter
     u .= utmp
     while err > tol && numiter <= maxiter
       udiff .= u
-      param_update_func(pnew,u,pold,ttmp)
-      S[1] = SaddleSystem(S[1],Hdt,f,pnew,pold,cache)
-      _constraint_r2!(utmp,f,u,pnew,t+dt)
+      param_update_func(pnew_ptr,u,pold_ptr,ttmp)
+      S[1] = SaddleSystem(S[1],Hdt,f,pnew_ptr,pold_ptr,cache)
+      _constraint_r2!(utmp,f,u,pnew_ptr,t+dt)
       mainvector(u) .= S[1]\mainvector(utmp)
       @.. udiff -= u
       numiter += 1
@@ -495,10 +497,9 @@ end
     @.. z /= dt
 
     # Final steps
-    param_update_func(pnew,u,p,t)
-    f.odef(integrator.fsallast, u, pnew, t+dt)
+    param_update_func(p,u,pold_ptr,t)
+    f.odef(integrator.fsallast, u, p, t+dt)
     integrator.destats.nf += 1
-    recursivecopy!(p,pnew)
 
     return nothing
 end

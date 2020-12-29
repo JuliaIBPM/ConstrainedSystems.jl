@@ -3,7 +3,7 @@
 const SaddleVector = ArrayPartition
 
 """
-    solvector()
+    solvector([;state=][,constraint=][,aux_state=])
 
 Build a solution vector for a constrained system. This takes three optional keyword
 arguments: `state`, `constraint`, and `aux_state`.
@@ -19,6 +19,7 @@ _solvector(s,c,aux) = ArrayPartition(s,c,aux)
 
 mainvector(u) = u
 mainvector(u::ArrayPartition) = ArrayPartition(u.x[1],u.x[2])
+
 
 
 
@@ -64,3 +65,24 @@ Construct a vector of a state part `u` and constraint part `f` of a
 saddle-point vector, to be associated with a [`SaddleSystem`](@ref).
 """
 function SaddleVector end
+
+
+"""
+    r1vector([;state_r1=][,aux_r1=])
+
+Build a vector of the `r1` functions for the state ODEs and auxiliary state ODEs.
+"""
+r1vector(;state_r1=nothing,aux_r1=nothing) = _r1vector(state_r1,aux_r1)
+_r1vector(::Nothing,::Nothing) = nothing
+_r1vector(s,::Nothing) = s
+_r1vector(::Nothing,a) = nothing
+_r1vector(s,a) = ArrayPartition((s,a))
+
+hasaux(r1) = false
+hasaux(r1::ArrayPartition) = true
+
+state_r1(r1) = r1
+state_r1(r1::ArrayPartition) = r1.x[1]
+
+aux_r1(r1) = nothing
+aux_r1(r1::ArrayPartition) = r1.x[2]

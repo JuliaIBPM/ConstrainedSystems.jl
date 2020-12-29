@@ -85,6 +85,14 @@ An optional keyword argument `param_update_func` can be used to set a function t
 the current solution. This function must take the in-place form `f(q,u,p,t)` or out of place form
 `f(u,p,t)` to create some `q` based on `u`. (Note that `q` might enter the function simply as `p`.) This function can
 be used to update `B1` and `B2` with state information, for example.
+
+We can also include another (unconstrained) set of equations to the set above:
+
+``
+\\dfrac{dx}{dt} = r_{1x}(x,t)
+``
+
+In this case, we would pass the pair of `r1` functions as an `ArrayPartition`.
 """
 struct ConstrainedODEFunction{iip,static,F1,F2,TMM,C,Ta,Tt,TJ,JVP,VJP,JP,SP,TW,TWt,TPJ,S,TCV,PF} <: AbstractODEFunction{iip}
     odef :: F1
@@ -126,6 +134,9 @@ function ConstrainedODEFunction(r1,r2,B1,B2,L=DiffEqLinearOperator(0*I);
 
     allinplace(r1,r2,B1,B2) || alloutofplace(r1,r2,B1,B2) || error("Inconsistent function signatures")
 
+    iip = allinplace(r1,r2,B1,B2)
+    static = param_update_func == DEFAULT_UPDATE_FUNC ? true : false
+
     L_local = (L isa DiffEqLinearOperator) ? L : DiffEqLinearOperator(L)
 
     zero_vec!(_func_cache)
@@ -134,9 +145,8 @@ function ConstrainedODEFunction(r1,r2,B1,B2,L=DiffEqLinearOperator(0*I);
     odef = SplitFunction(L_local, odef_nl ;_func_cache=deepcopy(_func_cache))
     conf = SplitFunction(_complete_r2(r2),_complete_B2(B2);_func_cache=deepcopy(_func_cache))
 
-    static = param_update_func == DEFAULT_UPDATE_FUNC ? true : false
 
-    ConstrainedODEFunction{isinplace(odef),static,typeof(odef),
+    ConstrainedODEFunction{iip,static,typeof(odef),
                            typeof(conf),typeof(mass_matrix),typeof(_func_cache),
                            typeof(analytic),typeof(tgrad),typeof(jac),typeof(jvp),typeof(vjp),
                            typeof(jac_prototype),typeof(sparsity),
@@ -146,6 +156,13 @@ function ConstrainedODEFunction(r1,r2,B1,B2,L=DiffEqLinearOperator(0*I);
                            sparsity,Wfact,Wfact_t,paramjac,syms,colorvec,param_update_func)
 end
 
+function Base.show(io::IO, m::MIME"text/plain",f::ConstrainedODEFunction{iip,static}) where {iip,static}
+    iips = iip ? "in-place" : "out-of-place"
+    statics = static ? "static" : "variable"
+    println(io,"Constrained ODE function of $iips type and $statics constraints")
+end
+
+# Here is where we define the structure of the function
 @inline _fetch_ode_L(f::ConstrainedODEFunction) = f.odef.f1
 @inline _fetch_ode_r1(f::ConstrainedODEFunction) = f.odef.f2.f.f1
 @inline _fetch_ode_neg_B1(f::ConstrainedODEFunction) = f.odef.f2.f.f2
@@ -163,15 +180,6 @@ end
 allinplace(r1,r2,B1,B2) = _isinplace_r1(r1) && _isinplace_r2(r2) && _isinplace_B1(B1) && _isinplace_B2(B2)
 alloutofplace(r1,r2,B1,B2) = _isoop_r1(r1) && _isoop_r2(r2) && _isoop_B1(B1) && _isoop_B2(B2)
 
-hasaux(r1) = false
-hasaux(r1::ArrayPartition) = true
-
-_state_r1(r1) = r1
-_state_r1(r1::ArrayPartition) = r1.x[1]
-
-_aux_r1(r1) = nothing
-_aux_r1(r1::ArrayPartition) = r1.x[2]
-
 
 for (f,nv) in ((:r1,4),(:r2,3),(:B1,3),(:B2,3))
   iipfcn = Symbol("_isinplace_",string(f))
@@ -187,12 +195,12 @@ end
 _complete_r1(r1,::Val{true},_func_cache) = (du,u,p,t) -> (dy = state(du); r1(dy,state(u),p,t))
 _complete_r1(r1,::Val{false},_func_cache) = (u,p,t) -> (du = deepcopy(u); zero_vec!(du); state(du) .= r1(state(u),p,t); return du)
 _complete_r1(r1::ArrayPartition,::Val{true},_func_cache) =
-            SplitFunction((du,u,p,t) ->(dy = state(du); dx = aux_state(du); zero_vec!(dx); _state_r1(r1)(dy,state(u),p,t)),
-                          (du,u,p,t) ->(dy = state(du); dx = aux_state(du); fill!(dy,0.0); _aux_r1(r1)(dx,aux_state(u),p,t));
+            SplitFunction((du,u,p,t) ->(dy = state(du); dx = aux_state(du); zero_vec!(dx); state_r1(r1)(dy,state(u),p,t)),
+                          (du,u,p,t) ->(dy = state(du); dx = aux_state(du); fill!(dy,0.0); aux_r1(r1)(dx,aux_state(u),p,t));
                           _func_cache=deepcopy(_func_cache))
 _complete_r1(r1::ArrayPartition,::Val{false},_func_cache) =
-            SplitFunction((u,p,t) -> (du = deepcopy(u); zero_vec!(du); state(du) .= _state_r1(r1)(state(u),p,t); return du),
-                          (u,p,t) -> (du = deepcopy(u); zero_vec!(du); aux_state(du) .= _aux_r1(r1)(aux_state(u),p,t); return du))
+            SplitFunction((u,p,t) -> (du = deepcopy(u); zero_vec!(du); state(du) .= state_r1(r1)(state(u),p,t); return du),
+                          (u,p,t) -> (du = deepcopy(u); zero_vec!(du); aux_state(du) .= aux_r1(r1)(aux_state(u),p,t); return du))
 
 
 _complete_r2(r2,::Val{true},_func_cache) = (du,u,p,t) -> (dz = constraint(du); r2(dz,p,t))
