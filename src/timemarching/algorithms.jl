@@ -187,7 +187,8 @@ end
 
 
 @muladd function perform_step!(integrator,cache::LiskaIFHERKCache{sc,ni,solverType},repeat_step=false) where {sc,ni,solverType}
-    @unpack t,dt,uprev,u,f,p,alg = integrator
+    @unpack t,dt,uprev,u,f,p,alg,opts = integrator
+    @unpack internalnorm = opts
     @unpack maxiter, tol = alg
     @unpack k1,k2,k3,utmp,udiff,dutmp,fsalfirst,Hhalfdt,Hzero,S,ptmp,k = cache
     @unpack ã11,ã21,ã22,ã31,ã32,ã33,c̃1,c̃2,c̃3 = cache.tab
@@ -227,7 +228,7 @@ end
       mainvector(u) .= S[1]\mainvector(utmp)
       @.. udiff -= u
       numiter += 1
-      err = _l2norm(udiff)
+      err = internalnorm(udiff,ttmp)
     end
     zero_vec!(xtmp)
     B1_times_z!(utmp,S[1])
@@ -258,7 +259,7 @@ end
       mainvector(u) .= S[1]\mainvector(utmp)
       @.. udiff -= u
       numiter += 1
-      err = _l2norm(udiff)
+      err = internalnorm(udiff,ttmp)
     end
     zero_vec!(xtmp)
     B1_times_z!(utmp,S[1])
@@ -290,7 +291,7 @@ end
       mainvector(u) .= S[2]\mainvector(utmp)
       @.. udiff -= u
       numiter += 1
-      err = _l2norm(udiff)
+      err = internalnorm(udiff,ttmp)
       #println("error = ",err)
     end
     @.. z /= (dt*ã33)
@@ -317,7 +318,8 @@ function initialize!(integrator,cache::LiskaIFHERKConstantCache)
 end
 
 @muladd function perform_step!(integrator,cache::LiskaIFHERKConstantCache{sc,ni,solverType},repeat_step=false) where {sc,ni,solverType}
-    @unpack t,dt,uprev,f,p,alg = integrator
+    @unpack t,dt,uprev,f,p,opts,alg = integrator
+    @unpack internalnorm = opts
     @unpack maxiter, tol = alg
     @unpack ã11,ã21,ã22,ã31,ã32,ã33,c̃1,c̃2,c̃3 = cache
     @unpack param_update_func = f
@@ -359,7 +361,7 @@ end
 
       @.. udiff -= u
       numiter += 1
-      err = _l2norm(udiff)
+      err = internalnorm(udiff,ttmp)
     end
     zero_vec!(aux_state(utmp))
     state(utmp) .= state(ducache)
@@ -389,7 +391,7 @@ end
       B1_times_z!(ducache,S)
       @.. udiff -= u
       numiter += 1
-      err = _l2norm(udiff)
+      err = internalnorm(udiff,ttmp)
     end
     zero_vec!(aux_state(utmp))
     state(utmp) .= state(ducache)
@@ -419,7 +421,7 @@ end
       mainvector(u) .= S\mainvector(utmp)
       @.. udiff -= u
       numiter += 1
-      err = _l2norm(udiff)
+      err = internalnorm(udiff,ttmp)
       #println("error = ",err)
     end
     @.. constraint(u) /= (dt*ã33)
@@ -455,7 +457,8 @@ function initialize!(integrator,cache::IFHEEulerCache)
 end
 
 @muladd function perform_step!(integrator,cache::IFHEEulerCache{sc,ni,solverType},repeat_step=false) where {sc,ni,solverType}
-    @unpack t,dt,uprev,u,f,p,alg = integrator
+    @unpack t,dt,uprev,u,f,p,opts,alg = integrator
+    @unpack internalnorm = opts
     @unpack k1,utmp,udiff,dutmp,fsalfirst,Hdt,S,ptmp,k = cache
     @unpack maxiter, tol = alg
     @unpack param_update_func = f
@@ -490,7 +493,7 @@ end
       mainvector(u) .= S[1]\mainvector(utmp)
       @.. udiff -= u
       numiter += 1
-      err = _l2norm(udiff)
+      err = internalnorm(udiff,ttmp)
       #println("error = ",err)
     end
     @.. z /= dt
@@ -518,7 +521,8 @@ function initialize!(integrator,cache::IFHEEulerConstantCache)
 end
 
 @muladd function perform_step!(integrator,cache::IFHEEulerConstantCache{sc,ni,solverType},repeat_step=false) where {sc,ni,solverType}
-  @unpack t,dt,uprev,f,p,alg = integrator
+  @unpack t,dt,uprev,f,p,opts,alg = integrator
+  @unpack internalnorm = opts
   @unpack maxiter, tol = alg
   @unpack param_update_func = f
 
@@ -552,7 +556,7 @@ end
     mainvector(u) .= S\mainvector(utmp)
     @.. udiff -= u
     numiter += 1
-    err = _l2norm(udiff)
+    err = internalnorm(udiff,t+dt)
     #println("error = ",err)
   end
   @.. constraint(u) /= dt

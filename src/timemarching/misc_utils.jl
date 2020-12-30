@@ -33,9 +33,10 @@ import OrdinaryDiffEq.DiffEqBase: UNITLESS_ABS2, ODE_DEFAULT_NORM, recursive_len
 @inline MY_UNITLESS_ABS2(x::AbstractArray) = (isempty(x) && return sum(MY_UNITLESS_ABS2,zero(eltype(x))); sum(MY_UNITLESS_ABS2, x))
 @inline MY_UNITLESS_ABS2(x::ArrayPartition) = sum(MY_UNITLESS_ABS2, x.x)
 
-
 @inline ODE_DEFAULT_NORM(u::ArrayPartition,t) = sqrt(MY_UNITLESS_ABS2(u)/recursive_length(u))
 
+
+@inline _l2norm(u) = sqrt(recursive_mean(map(x -> float(x).^2,u)))
 
 
 zero_vec!(::Nothing) = nothing
@@ -59,9 +60,7 @@ function recursivecopy!(dest :: AbstractArray{T}, src :: AbstractArray{T}) where
     return dest
 end
 
-@inline function _l2norm(u)
-  sqrt(recursive_mean(map(x -> float(x).^2,u)))
-end
+
 
 # Seed the state vector with two sets of random values, apply the constraint operator on a
 needs_iteration(f::ConstrainedODEFunction{iip},u,p,rate_prototype) where {iip} = _needs_iteration(f,u,p,rate_prototype,Val(iip))
