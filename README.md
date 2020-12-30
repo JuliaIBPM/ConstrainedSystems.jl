@@ -1,10 +1,12 @@
 # ConstrainedSystems.jl
 _Tools for solving constrained dynamical systems_
 
-
 | Documentation | Build Status |
 |:---:|:---:|
-|  [![docs](https://img.shields.io/badge/docs-latest-blue.svg)](https://JuliaIBPM.github.io/ConstrainedSystems.jl/latest)  | [![Build Status](https://travis-ci.org/JuliaIBPM/ConstrainedSystems.jl.svg?branch=master)](https://travis-ci.org/JuliaIBPM/ConstrainedSystems.jl) [![Build status](https://ci.appveyor.com/api/projects/status/6tokpjqb4x8999g0?svg=true)](https://ci.appveyor.com/project/JuliaIBPM/constrainedsystems-jl) [![codecov](https://codecov.io/gh/JuliaIBPM/ConstrainedSystems.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/JuliaIBPM/ConstrainedSystems.jl) |
+| [![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://JuliaIBPM.github.io/ConstrainedSystems.jl/stable)
+[![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://JuliaIBPM.github.io/ConstrainedSystems.jl/dev) |
+[![Build Status](https://github.com/JuliaIBPM/ConstrainedSystems.jl/workflows/CI/badge.svg)](https://github.com/JuliaIBPM/ConstrainedSystems.jl/actions)
+[![Coverage](https://codecov.io/gh/JuliaIBPM/ConstrainedSystems.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/JuliaIBPM/ConstrainedSystems.jl)
 
 
 This package contains several tools for solving and advancing (large-scale) dynamical systems with constraints. These systems generically have the form
@@ -27,7 +29,7 @@ up a problem and solving it.
 
 * Allowance for variable constraint operators B<sub>1</sub><sup>T</sup> and B<sub>2</sub>,
 through the use of a variable parameter argument and an associated parameter update
-function. 
+function.
 
 * The ability to add an auxiliary (unconstrained) system of equations that the
 constraint operators B<sub>1</sub><sup>T</sup> and B<sub>2</sub> depend upon.
