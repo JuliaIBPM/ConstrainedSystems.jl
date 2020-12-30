@@ -9,20 +9,27 @@ _Tools for solving constrained dynamical systems_
 
 This package contains several tools for solving and advancing (large-scale) dynamical systems with constraints. These systems generically have the form
 
-du/dt = A u - B<sub>1</sub><sup>T</sup> f + r<sub>1</sub>(u,t)
+dy/dt = L y - B<sub>1</sub><sup>T</sup> z + r<sub>1</sub>(y,t)
 
-B<sub>2</sub> u = r<sub>2</sub>(u,t)
+B<sub>2</sub> y = r<sub>2</sub>(y,t)
 
-u(0) = u<sub>0</sub>
+y(0) = y<sub>0</sub>
 
-where u is a state vector, A is a linear operator with an associated matrix exponential (integrating factor), and f is a constraint force vector (i.e., Lagrange multipliers).
+where y is a state vector, L is a linear operator with an associated matrix exponential (integrating factor), and z is a constraint force vector (i.e., Lagrange multipliers).
 
 Some of the key components of this package are
 
 * Tools for solving linear algebra problems with constraints and associated Lagrange multipliers, known generically as *saddle point systems*. The sizes of these systems might be large.
 
-* Time integrators that can incorporate these constraints, such as half-explicit Runge-Kutta (HERK) and integrating factor Runge-Kutta (IFRK), or their combination (IF-HERK).
+* Time integrators that can incorporate these constraints, such as half-explicit Runge-Kutta (HERK) and integrating factor Runge-Kutta (IFRK), or their combination (IF-HERK). These
+extend the tools in the [DifferentialEquations.jl](https://github.com/SciML/DifferentialEquations.jl) package, and utilize the same basic syntax for setting
+up a problem and solving it.
 
-It should be noted that the [DifferentialEquations.jl](https://github.com/SciML/DifferentialEquations.jl) package provides a nearly comprehensive set of tools for differential equations. However, the current package provides functionality for constrained systems.
+* Allowance for variable constraint operators B<sub>1</sub><sup>T</sup> and B<sub>2</sub>,
+through the use of a variable parameter argument and an associated parameter update
+function. 
+
+* The ability to add an auxiliary (unconstrained) system of equations that the
+constraint operators B<sub>1</sub><sup>T</sup> and B<sub>2</sub> depend upon.
 
 The package is agnostic to the type of systems, and might arise from, e.g., fluid dynamics or rigid-body mechanics.

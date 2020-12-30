@@ -24,128 +24,21 @@ using ConstrainedSystems
 using CartesianGrids
 using Plots
 ```
-`ConstrainedSystems` is equipped with a few classes of time marching schemes for advancing time-dependent
-equations.
+`ConstrainedSystems` is equipped with tools for solving systems of equations of the
+general form of half-explicit differential-algebraic equations,
 
-## Integrating factor systems
+$$\ddt y = L u - B_1^T(y,t) z + r_1(y,t), \quad B_2(y,t) y = r_2(t), \quad y(0) = y_0$$
 
-Integrating factor systems that we encounter in `ConstrainedSystems` are of the form
+where $z$ is the Lagrange multiplier for enforcing the constraints on $y$. Note
+that the constraint operators may depend on the state and on time. The linear operator $L$ may be a matrix or a scalar, but is generally independent of time. (The method of integrating factors can deal with time-dependent $L$, but we don't encounter such systems in the `ConstrainedSystems` context so we won't discuss them.) Our objective is to solve
+for $y(t)$ and $z(t)$.
 
-$$\ddt u = A u + r_1(u,t), \quad u(0) = u_0$$
-
-The operator $A$ may be a matrix or a scalar, but is generally independent of time. (The
-  method of integrating factors can deal with time-dependent $A$, but we don't encounter
-  such systems in the `ConstrainedSystems` context so we won't discuss them.) For this purpose, we use the `IFRK` class of solver, which stands for Integrating Factor Runge-Kutta. This method solves
-  the part associated with $A$ exactly, via the integrating factor, and advances a modified
-  equation by Runge-Kutta method to account for the remaining part $r_1$.
-
-  We discussed the construction
-  of the integrating factor in the context of fields in [CartesianGrids](https://juliaibpm.github.io/CartesianGrids.jl/latest/). But first, let's
-  give an example of how we can solve a simpler problem with just a single scalar-valued
-  $u$. The example we will solve is
-
-$$\ddt u = -\alpha u + \cos(\omega t),\quad u(0) = u_0$$
-
-The exact solution is easily obtained:
-
-$$u(t) = u_0 e^{-\alpha t} + \frac{1}{\alpha^2+\omega^2} \left[ \alpha(\cos(\omega t) - e^{-\alpha t}) + \omega \sin (\omega t)\right]$$
-
-Let's solve it numerically, so we can evaluate the accuracy of the solver. We should note that the
-integrating factor for this system is $e^{-\alpha t}$.
-
-For demonstration, we will set $\alpha = 1$, $\omega = 4$, and $u_0 = 1$.
-
-```@setup march
-using ConstrainedSystems
-using CartesianGrids
-using Plots
-pyplot()
-```
-
-```@repl march
-α = 1; ω = 4; u₀ = 1.0;
-```
-
-Here is the exact solution for later comparison
-```@repl march
-uex(t) = u₀*exp(-α*t) + (α*(cos(ω*t)-exp(-α*t))+ω*sin(ω*t))/(α^2+ω^2)
-```
-
-The first steps are to define operators that provide the integrating factor and the right-hand side
-of the equations. For the integrating factor, we define an extended form of `plan_intfact`
-
-```@repl march
-CartesianGrids.plan_intfact(t::Float64,u::Vector{Float64}) = exp(-α*t);
-```
-
-Note that we have defined this form of `plan_intfact` to adhere to the standard form,
-accepting arguments for time `t` and the state vector `u`, even though the state vector isn't strictly needed here. The state 'vector' in this problem is actually only a scalar, of course. But
-the time marching method does not accept scalar-type states currently, so we will
-make `u` a 1-element vector to use the `ConstrainedSystems` tools.
-
-Now let us define the right-hand side function. This function should also adhere to the standard
-form, which requires the state vector `u` and the time `t` as arguments.
-
-```@repl march
-r₁(u::Vector{Float64},t::Float64) = cos(ω*t);
-```
-
-We also need to set the time-step size ($0.01$) and the initial condition. For the latter,
-we set up the state vector as a 1-element vector, as discussed earlier:
-```@repl march
-Δt = 0.01;
-u = [u₀];
-```
-We can now construct the integrator. We supply a form of the state vector (for use as a template
-  for pre-allocating space for internal storage variables), the time-step size, and the
-  definitions of the integrating factor and the right-hand side function:
-
-```@repl march
-ifrk = IFRK(u,Δt,plan_intfact,r₁,rk=ConstrainedSystems.RK31)
-```
-
-We have set the time step size to $0.01$. We have also specified that the Runge-Kutta method to be used is a third-order method, `RK31`, specially designed for storing as few different versions of the integrating factor as necessary. This is actually the default method, so we could have omitted this keyword
-argument. There are other choices, as well, such as `ConstrainedSystems.Euler` for the
-forward Euler method.
-
-Now we can solve the system. The integrator has a simple form, accepting as arguments
-the current time and state, and returning the updated versions of these at the end of the
-step. We place this integrator inside of a loop and store the results. (Since `u` is set up
-  as a 1-element vector, then we will store only the element of this vector.)
-
-```@repl march
-uhist = Float64[]; # for storing the solution
-T = 0:Δt:10;
-t = 0.0;
-for ti in T
-  push!(uhist,u[1]) # storage
-  global t, u = ifrk(t,u) # advancement by one step by the integrator
-end
-```
-
-Now we can plot the result and compare it with the exact solution.
-
-```@repl march
-plot(T,uhist,label="numerical",xlabel="t",ylabel="u(t)")
-plot!(T,uex.(T),label="exact soln")
-savefig("ifrk.svg"); nothing # hide
-```
-![](ifrk.svg)
-
-As we can see, the results are nearly indistinguishable.
-
-## Constrained systems
 
 ## Constrained integrating factor systems
 
-Constrained integrating factor systems that we encounter in `ConstrainedSystems` are of the form
-
-$$\ddt u = A u - B_1^T f + r_1(u,t), \quad B_2 u = r_2(u,t), \quad u(0) = u_0$$
-
-where $f$ is again the Lagrange multiplier for enforcing the constraints on $u$. Now, we combine the ideas of the last two sections into a single integrator.
 
 Let's demonstrate this on the example of heat diffusion from a circular ring whose temperature
-is held constant. In this case, $A$ is the discrete Laplace operator, $L$, times the heat diffusivity,
+is held constant. In this case, $L$ is the discrete Laplace operator times the heat diffusivity,
 $r_1$ is zero (in the absence of volumetric heating sources), and $r_2$ is the temperature of
 the ring. The operators $B_1^T$ and $B_2$ will be the regularization and interpolation
 operators between discrete point-wise data on the ring and the field data.
@@ -158,7 +51,7 @@ First, we will construct a field to accept the temperature on
 
 ```@repl march
 nx = 129; ny = 129; Lx = 2.0; Δx = Lx/(nx-2);
-u₀ = Nodes(Dual,(nx,ny)); # field initial condition
+w₀ = Nodes(Dual,(nx,ny)); # field initial condition
 ```
 
 Now set up a ring of points on the circle at center $(1,1)$.
@@ -167,74 +60,232 @@ Now set up a ring of points on the circle at center $(1,1)$.
 n = 128; θ = range(0,stop=2π,length=n+1);
 R = 0.5; xb = 1.0 .+ R*cos.(θ); yb = 1.0 .+ R*sin.(θ);
 X = VectorData(xb[1:n],yb[1:n]);
-f = ScalarData(X); # to be used as the Lagrange multiplier
+z = ScalarData(X); # to be used as the Lagrange multiplier
 ```
 
-From this, construct the regularization and interpolation operators in their usual
-symmetric form, and then set up a routine that will provide these operators inside the integrator:
+Together, `w₀` and `z` comprise the initial solution vector:
+
+```@repl march
+u₀ = solvector(state=w₀,constraint=z)
+```
+
+Now set up the operators. We first set up the linear operator, a Laplacian endowed
+with its inverse:
+
+```@repl march
+L = plan_laplacian(w₀,with_inverse=true)
+```
+
+Now the right-hand side operators for the ODEs and constraints. Both must take a standard form:
+$r_1$ must accept arguments `w₀`, `p` (parameters not used in this problem), and `t`; $r_2$ must accept arguments `p` and `t`. We will implement these in in-place form to make
+it more efficient. $r_1$ will return rate-of-change data of the same type as `w₀`
+and $r_2$ will return data `dz` of the same type as `z`
+
+```@repl march
+diffusion_rhs!(dw::Nodes,w::Nodes,p,t) = fill!(dw,0.0) # this is r1
+boundary_constraint_rhs!(dz::ScalarData,p,t) = fill!(dz,1.0) # this is r2, and sets uniformly to 1
+```
+
+Construct the regularization and interpolation operators in their usual
+symmetric form, and then set up routines that will provide these operators inside the integrator:
 
 ```@repl march
 reg = Regularize(X,Δx;issymmetric=true)
-Hmat, Emat = RegularizationMatrix(reg,f,u₀);
-plan_constraints(u::Nodes{Dual,nx,ny},t::Float64) = Hmat, Emat
+Hmat, Emat = RegularizationMatrix(reg,z,w₀)
+
+boundary_constraint_force!(dw::Nodes,z::ScalarData,p) = dw .= Hmat*z # This is B1T
+boundary_constraint_op!(dz::ScalarData,y::Nodes,p) = dz .= Emat*y;  # This is B2
 ```
 
-Now set up the right-hand side operators. Both must take the standard form, with
-arguments of the types of `u` and `t`. For $r_1$, we will simply set it to a field
-of zeros in the same type as `u`. For $r_2$, we set the result uniformly to $1$.
+Note that these last two functions are also in-place, and return data of the same
+respective types as $r_1$ and $r_2$.
+
+All of these are assembled into a single `ConstrainedODEFunction`:
 
 ```@repl march
-r₁(u::Nodes{T,NX,NY},t::Float64) where {T,NX,NY} = Nodes(T,u); # sets to zeros
-r₂(u::Nodes{T,NX,NY},t::Float64) where {T,NX,NY} = 1.0; # sets uniformly to 1.0
+f = ConstrainedODEFunction(diffusion_rhs!,boundary_constraint_rhs!,boundary_constraint_force!,
+                          boundary_constraint_op!,L,
+                          _func_cache=u₀)
 ```
 
-We will set the time-step size to a large value ($1.0$) for demonstration purposes.
-The method remains stable for any choice. We also initialize time `t` and the state
-`u`:
+With the last argument, we supplied a cache variable to enable evaluation of this function.
+
+Now set up the problem, using the same basic notation as in [DifferentialEquations.jl](https://github.com/SciML/DifferentialEquations.jl).
 
 ```@repl march
-Δt = 1.0;
-t = 0.0;
-u = deepcopy(u₀);
+tspan = (0.0,20.0)
+prob = ODEProblem(f,u₀,tspan)
+
 ```
 
-Now we can construct the integrator. We supply examples for the state `u` and the
-Lagrange multiplier data `f`, the time-step size, the constructor for the
-integrating factor, a tuple of the operators for computing the actions of $B_1^T$ and $B_2$
-on data of type `f` and `u`, respectively (which, in this case, are matrices `Hmat` and `Emat`),
-and a tuple of the right-hand side functions.
-
+Now solve it. We will set the time-step size to a large value ($1.0$) for demonstration purposes. The method remains stable for any choice.
 ```@repl march
-solver = IFHERK(u,f,Δt,CartesianGrids.plan_intfact,plan_constraints,(r₁,r₂),
-                rk=ConstrainedSystems.Euler)
-```
-
-Here we've set the method to forward Euler. The resulting integrator accepts
-as arguments the current time `t` and the current state `u`, and returns the
-time, state, and Lagrange multiplier data at the end of the time step.
-
-Now, let's advance the system. We'll also time it.
-
-```@repl march
-@time for i = 1:20
-  global t, u, f = solver(t,u)
-end
+Δt = 1.0
+sol = solve(prob,IFHEEuler(),dt=Δt);
 ```
 
 Now let's plot it
 
 ```@repl march
-xg, yg = coordinates(u,dx=Δx);
-plot(xg,yg,u)
+xg, yg = coordinates(w₀,dx=Δx);
+plot(xg,yg,state(sol.u[end]))
 plot!(xb,yb,linecolor=:black,linewidth=1.5)
-savefig("ifherk.svg"); nothing # hide
 ```
 ![](ifherk.svg)
 
 From a side view, we can see that it enforces the boundary condition:
 
 ```@repl march
-plot(xg,u[65,:],xlabel="x",ylabel="u(x,1)")
+plot(xg,state(sol.u[end])[65,:],xlabel="x",ylabel="u(x,1)")
 savefig("ifherk-side.svg"); nothing # hide
 ```
 ![](ifherk-side.svg)
+
+## Systems with variable constraints
+
+In some cases, the constraint operators may vary with the state vector. A
+good example of this is a swinging pendulum, with its equations expressed in
+Cartesian coordinates. The constraint we wish to enforce is that the length
+of the pendulum is constant: $x^2+y^2 = l^2$. Though not mathematically necessary,
+it also helps to enforce a tangency condition, $xu + yv = 0$, where $u$ and $v$
+are the rates of change of $x$ and $y$. Note that this is simply the derivative
+of the first constraint. (If expressed in cylindrical coordinates, the constraint is enforced
+automatically, simply by expressing the equations for $\theta$.)
+
+The governing equations are
+
+$$\ddt x = u - x \mu ,\, \ddt y = v - y \mu , \, \ddt u = -x \lambda , \, \ddt v = -g - y\lambda$$
+
+with Lagrange multipliers $\mu$ and $\lambda$, and the constraints are
+
+$$ x^2+y^2 = l^2,\, xu + yu = 0$$
+
+These are equivalently expressed as
+
+$$\left[ \begin{array}{cccc} x & y & 0 & 0\end{array}\right]\left[ \begin{array}{c} x \\ y \\ u \\ v \end{array}\right] = l^2$$
+
+and
+
+$$\left[ \begin{array}{cccc} 0 & 0 & x & y\end{array}\right]\left[ \begin{array}{c} x \\ y \\ u \\ v \end{array}\right] = 0$$
+
+The operators $B_1^T$ and $B_2$ are thus
+
+$$ B_1^T = \left[ \begin{array}{cc} x & 0 \\ y & 0 \\ 0 & x \\ 0 & y \end{array}\right]$$
+
+and
+
+$$ B_2 = \left[ \begin{array}{cccc} x & y & 0 & 0 \\ 0 & 0 & x & y \end{array}\right]$$
+
+That is, the operators are dependent on the state. In `ConstrainedSystems`, we handle this
+by providing a parameter that can be dynamically updated. We will get to that later. First,
+let's set up the physical parameters
+
+```@repl march
+l = 1.0
+g = 1.0
+params = [l,g]
+```
+
+and initial condition:
+
+```@repl march
+θ₀ = π/2
+y₀ = Float64[l*sin(θ₀),-l*cos(θ₀),0,0]
+z₀ = Float64[0.0, 0.0] # Lagrange multipliers
+u₀ = solvector(state=y₀,constraint=z₀)
+```
+
+Now, we will set up the basic form of the constraint operators and assemble
+these with the other parameters with the help of a type we'll define here:
+
+```@repl march
+struct ProblemParams{P,BT1,BT2}
+    params :: P
+    B₁ᵀ :: BT1
+    B₂ :: BT2
+end
+
+B1T = zeros(4,2) # set to zeros for now
+B2 = zeros(2,4)  # set to zeros for now
+p₀ = ProblemParams(params,B1T,B2);
+```
+
+We will now define the operators of the problem, all in in-place form:
+
+```@repl march
+#r1
+function pendulum_rhs!(dy::Vector{Float64},y::Vector{Float64},p,t)
+    dy[1] = y[3]
+    dy[2] = y[4]
+    dy[3] = 0.0
+    dy[4] = -p.params[2]
+    return dy
+  end
+
+# r2
+function length_constraint_rhs!(dz::Vector{Float64},p,t)
+    dz[1] = p.params[1]^2
+    dz[2] = 0.0
+    return dz
+end
+
+# The B1 function. This returns B1*z. It uses an existing B1 supplied by p.
+function length_constraint_force!(dy::Vector{Float64},z::Vector{Float64},p)
+    dy .= p.B₁ᵀ*z
+end
+
+# The B2 function. This returns B2*y. It uses an existing B2 supplied by p.
+function length_constraint_op!(dz::Vector{Float64},y::Vector{Float64},p)
+    dz .= p.B₂*y
+end
+```
+
+Now, we need to provide a means of updating the parameter structure with
+the current state of the system. This is done in-place, just as for the
+other operators:
+
+```@repl march
+function update_p!(q,u,p,t)
+    y = state(u)
+    fill!(q.B₁ᵀ,0.0)
+    fill!(q.B₂,0.0)
+    q.B₁ᵀ[1,1] = y[1]; q.B₁ᵀ[2,1] = y[2]; q.B₁ᵀ[3,2] = y[1]; q.B₁ᵀ[4,2] = y[2]
+    q.B₂[1,1] = y[1]; q.B₂[1,2] = y[2]; q.B₂[2,3] = y[1]; q.B₂[2,4] = y[2]
+    return q
+end
+```
+
+Finally, assemble all of them together:
+
+```@repl march
+f = ConstrainedODEFunction(pendulum_rhs!,length_constraint_rhs!,length_constraint_force!,
+                                length_constraint_op!,
+                               _func_cache=deepcopy(u₀),param_update_func=update_p!)
+```
+
+Now solve the system
+
+```@repl march
+tspan = (0.0,10.0)
+prob = ODEProblem(f,u₀,tspan,p₀)
+
+Δt = 1e-2
+sol = solve(prob,LiskaIFHERK(),dt=Δt);
+```
+
+Plot the solution
+
+```@repl march
+plot(sol.t,sol[1,:],label="x",xlabel="t")
+plot!(sol.t,sol[2,:],label="y")
+savefig("pendulum.svg"); nothing # hide
+```
+![](pendulum.svg)
+
+and here is the trajectory
+
+```@repl march
+plot(sol[1,:],sol[2,:],ratio=1,legend=:false,title="Trajectory")
+savefig("pendulum-traj.svg"); nothing # hide
+```
+![](pendulum-traj.svg)
