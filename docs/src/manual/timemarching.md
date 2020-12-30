@@ -140,3 +140,152 @@ plot(xg,state(sol.u[end])[65,:],xlabel="x",ylabel="u(x,1)")
 savefig("ifherk-side.svg"); nothing # hide
 ```
 ![](ifherk-side.svg)
+
+## Systems with variable constraints
+
+In some cases, the constraint operators may vary with the state vector. A
+good example of this is a swinging pendulum, with its equations expressed in
+Cartesian coordinates. The constraint we wish to enforce is that the length
+of the pendulum is constant: $x^2+y^2 = l^2$. Though not mathematically necessary,
+it also helps to enforce a tangency condition, $xu + yv = 0$, where $u$ and $v$
+are the rates of change of $x$ and $y$. Note that this is simply the derivative
+of the first constraint. (If expressed in cylindrical coordinates, the constraint is enforced
+automatically, simply by expressing the equations for $\theta$.)
+
+The governing equations are
+
+$$\ddt x = u - x \mu ,\, \ddt y = v - y \mu , \, \ddt u = -x \lambda , \, \ddt v = -g - y\lambda$$
+
+with Lagrange multipliers $\mu$ and $\lambda$, and the constraints are
+
+$$ x^2+y^2 = l^2,\, xu + yu = 0$$
+
+These are equivalently expressed as
+
+$$\left[ \begin{array}{cccc} x & y & 0 & 0\end{array}\right]\left[ \begin{array}{c} x \\ y \\ u \\ v \end{array}\right] = l^2$$
+
+and
+
+$$\left[ \begin{array}{cccc} 0 & 0 & x & y\end{array}\right]\left[ \begin{array}{c} x \\ y \\ u \\ v \end{array}\right] = 0$$
+
+The operators $B_1^T$ and $B_2$ are thus
+
+$$ B_1^T = \left[ \begin{array}{cc} x & 0 \\ y & 0 \\ 0 & x \\ 0 & y \end{array}\right]$$
+
+and
+
+$$ B_2 = \left[ \begin{array}{cccc} x & y & 0 & 0 \\ 0 & 0 & x & y \end{array}\right]$$
+
+That is, the operators are dependent on the state. In `ConstrainedSystems`, we handle this
+by providing a parameter that can be dynamically updated. We will get to that later. First,
+let's set up the physical parameters
+
+```@repl march
+l = 1.0
+g = 1.0
+params = [l,g]
+```
+
+and initial condition:
+
+```@repl march
+θ₀ = π/2
+y₀ = Float64[l*sin(θ₀),-l*cos(θ₀),0,0]
+z₀ = Float64[0.0, 0.0] # Lagrange multipliers
+u₀ = solvector(state=y₀,constraint=z₀)
+```
+
+Now, we will set up the basic form of the constraint operators and assemble
+these with the other parameters with the help of a type we'll define here:
+
+```@repl march
+struct ProblemParams{P,BT1,BT2}
+    params :: P
+    B₁ᵀ :: BT1
+    B₂ :: BT2
+end
+
+B1T = zeros(4,2) # set to zeros for now
+B2 = zeros(2,4)  # set to zeros for now
+p₀ = ProblemParams(params,B1T,B2);
+```
+
+We will now define the operators of the problem, all in in-place form:
+
+```@repl march
+#r1
+function pendulum_rhs!(dy::Vector{Float64},y::Vector{Float64},p,t)
+    dy[1] = y[3]
+    dy[2] = y[4]
+    dy[3] = 0.0
+    dy[4] = -p.params[2]
+    return dy
+  end
+
+# r2
+function length_constraint_rhs!(dz::Vector{Float64},p,t)
+    dz[1] = p.params[1]^2
+    dz[2] = 0.0
+    return dz
+end
+
+# The B1 function. This returns B1*z. It uses an existing B1 supplied by p.
+function length_constraint_force!(dy::Vector{Float64},z::Vector{Float64},p)
+    dy .= p.B₁ᵀ*z
+end
+
+# The B2 function. This returns B2*y. It uses an existing B2 supplied by p.
+function length_constraint_op!(dz::Vector{Float64},y::Vector{Float64},p)
+    dz .= p.B₂*y
+end
+```
+
+Now, we need to provide a means of updating the parameter structure with
+the current state of the system. This is done in-place, just as for the
+other operators:
+
+```@repl march
+function update_p!(q,u,p,t)
+    y = state(u)
+    fill!(q.B₁ᵀ,0.0)
+    fill!(q.B₂,0.0)
+    q.B₁ᵀ[1,1] = y[1]; q.B₁ᵀ[2,1] = y[2]; q.B₁ᵀ[3,2] = y[1]; q.B₁ᵀ[4,2] = y[2]
+    q.B₂[1,1] = y[1]; q.B₂[1,2] = y[2]; q.B₂[2,3] = y[1]; q.B₂[2,4] = y[2]
+    return q
+end
+```
+
+Finally, assemble all of them together:
+
+```@repl march
+f = ConstrainedODEFunction(pendulum_rhs!,length_constraint_rhs!,length_constraint_force!,
+                                length_constraint_op!,
+                               _func_cache=deepcopy(u₀),param_update_func=update_p!)
+```
+
+Now solve the system
+
+```@repl march
+tspan = (0.0,10.0)
+prob = ODEProblem(f,u₀,tspan,p₀)
+
+Δt = 1e-2
+sol = solve(prob,LiskaIFHERK(),dt=Δt);
+```
+
+Plot the solution
+
+```@repl march
+plot(sol.t,sol[1,:],label="x",xlabel="t")
+plot!(sol.t,sol[2,:],label="y")
+savefig("pendulum.svg"); nothing # hide
+```
+![](pendulum.svg)
+
+and here is the trajectory
+
+```@repl march
+plot(sol[1,:],sol[2,:],ratio=1,legend=:false,title="Trajectory")
+savefig("pendulum-traj.svg"); nothing # hide
+```
+![](pendulum-traj.svg)
