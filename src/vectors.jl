@@ -57,8 +57,7 @@ constraint(u) = eltype(u)[]
 Provide the auxiliary state part of the given vector `x`
 """
 aux_state(u) = nothing # Array{eltype(u)}(undef,0,0)
-#aux_state(u::ArrayPartition{T,Tuple{A,F}}) where {T,A<:ArrayPartition,F} = u.x[2]
-aux_state(u::ArrayPartition{T,NTuple{3,F}}) where {T,F} = u.x[3]
+aux_state(u::ArrayPartition{T,Tuple{F1,F2,F3}}) where {T,F1,F2,F3} = u.x[3]
 
 
 
