@@ -16,7 +16,7 @@ Reexport = "189a3867-3050-52da-a836-e630ba90ab69"
 
 [compat]
 BenchmarkTools = "0.5"
-IterativeSolvers = "0.8"
+IterativeSolvers = "0.8, 0.9"
 LinearMaps = "^2.4"
 OrdinaryDiffEq = "5.46.0"
 PkgBenchmark = "0.2.10"
