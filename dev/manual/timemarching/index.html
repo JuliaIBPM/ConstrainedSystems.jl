@@ -8,51 +8,54 @@
 
 \renewcommand{\d}{\,\mathrm{d}}\]</p><p><code>ConstrainedSystems</code> is equipped with tools for solving systems of equations of the general form of half-explicit differential-algebraic equations,</p><p class="math-container">\[\ddt y = L u - B_1^T(y,t) z + r_1(y,t), \quad B_2(y,t) y = r_2(t), \quad y(0) = y_0\]</p><p>where <span>$z$</span> is the Lagrange multiplier for enforcing the constraints on <span>$y$</span>. Note that the constraint operators may depend on the state and on time. The linear operator <span>$L$</span> may be a matrix or a scalar, but is generally independent of time. (The method of integrating factors can deal with time-dependent <span>$L$</span>, but we don&#39;t encounter such systems in the <code>ConstrainedSystems</code> context so we won&#39;t discuss them.) Our objective is to solve for <span>$y(t)$</span> and <span>$z(t)$</span>.</p><h2 id="Constrained-integrating-factor-systems"><a class="docs-heading-anchor" href="#Constrained-integrating-factor-systems">Constrained integrating factor systems</a><a id="Constrained-integrating-factor-systems-1"></a><a class="docs-heading-anchor-permalink" href="#Constrained-integrating-factor-systems" title="Permalink"></a></h2><p>Let&#39;s demonstrate this on the example of heat diffusion from a circular ring whose temperature is held constant. In this case, <span>$L$</span> is the discrete Laplace operator times the heat diffusivity, <span>$r_1$</span> is zero (in the absence of volumetric heating sources), and <span>$r_2$</span> is the temperature of the ring. The operators <span>$B_1^T$</span> and <span>$B_2$</span> will be the regularization and interpolation operators between discrete point-wise data on the ring and the field data.</p><p>The ring will have radius <span>$1/2$</span> and fixed temperature <span>$1$</span>, and the heat diffusivity is <span>$1$</span>. (In other words, the problem has been non-dimensionalized by the diameter of the circle, the dimensional ring temperature, and the dimensional diffusivity.)</p><p>First, we will construct a field to accept the temperature on</p><pre><code class="language-julia-repl">julia&gt; nx = 129; ny = 129; Lx = 2.0; Δx = Lx/(nx-2);
 
-julia&gt; w₀ = Nodes(Dual,(nx,ny)); # field initial condition
-ERROR: UndefVarError: Nodes not defined</code></pre><p>Now set up a ring of points on the circle at center <span>$(1,1)$</span>.</p><pre><code class="language-julia-repl">julia&gt; n = 128; θ = range(0,stop=2π,length=n+1);
+julia&gt; w₀ = Nodes(Dual,(nx,ny)); # field initial condition</code></pre><p>Now set up a ring of points on the circle at center <span>$(1,1)$</span>.</p><pre><code class="language-julia-repl">julia&gt; n = 128; θ = range(0,stop=2π,length=n+1);
 
 julia&gt; R = 0.5; xb = 1.0 .+ R*cos.(θ); yb = 1.0 .+ R*sin.(θ);
 
 julia&gt; X = VectorData(xb[1:n],yb[1:n]);
-ERROR: UndefVarError: VectorData not defined
 
-julia&gt; z = ScalarData(X); # to be used as the Lagrange multiplier
-ERROR: UndefVarError: ScalarData not defined</code></pre><p>Together, <code>w₀</code> and <code>z</code> comprise the initial solution vector:</p><pre><code class="language-julia-repl">julia&gt; u₀ = solvector(state=w₀,constraint=z)
-ERROR: UndefVarError: w₀ not defined</code></pre><p>Now set up the operators. We first set up the linear operator, a Laplacian endowed with its inverse:</p><pre><code class="language-julia-repl">julia&gt; L = plan_laplacian(w₀,with_inverse=true)
-ERROR: UndefVarError: plan_laplacian not defined</code></pre><p>Now the right-hand side operators for the ODEs and constraints. Both must take a standard form: <span>$r_1$</span> must accept arguments <code>w₀</code>, <code>p</code> (parameters not used in this problem), and <code>t</code>; <span>$r_2$</span> must accept arguments <code>p</code> and <code>t</code>. We will implement these in in-place form to make it more efficient. <span>$r_1$</span> will return rate-of-change data of the same type as <code>w₀</code> and <span>$r_2$</span> will return data <code>dz</code> of the same type as <code>z</code></p><pre><code class="language-julia-repl">julia&gt; diffusion_rhs!(dw::Nodes,w::Nodes,p,t) = fill!(dw,0.0) # this is r1
-ERROR: UndefVarError: Nodes not defined
+julia&gt; z = ScalarData(X); # to be used as the Lagrange multiplier</code></pre><p>Together, <code>w₀</code> and <code>z</code> comprise the initial solution vector:</p><pre><code class="language-julia-repl">julia&gt; u₀ = solvector(state=w₀,constraint=z)
+(CartesianGrids.Dual nodes in a (nx = 129, ny = 129) cell grid of type Float64 data
+  Number of CartesianGrids.Dual nodes: (nx = 129, ny = 129), [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0  …  0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])</code></pre><p>Now set up the operators. We first set up the linear operator, a Laplacian endowed with its inverse:</p><pre><code class="language-julia-repl">julia&gt; L = plan_laplacian(w₀,with_inverse=true)
+Discrete Laplacian (and inverse) on a (nx = 129, ny = 129) grid acting on Float64 data with spacing 1.0</code></pre><p>Now the right-hand side operators for the ODEs and constraints. Both must take a standard form: <span>$r_1$</span> must accept arguments <code>w₀</code>, <code>p</code> (parameters not used in this problem), and <code>t</code>; <span>$r_2$</span> must accept arguments <code>p</code> and <code>t</code>. We will implement these in in-place form to make it more efficient. <span>$r_1$</span> will return rate-of-change data of the same type as <code>w₀</code> and <span>$r_2$</span> will return data <code>dz</code> of the same type as <code>z</code></p><pre><code class="language-julia-repl">julia&gt; diffusion_rhs!(dw::Nodes,w::Nodes,p,t) = fill!(dw,0.0) # this is r1
+diffusion_rhs! (generic function with 1 method)
 
 julia&gt; boundary_constraint_rhs!(dz::ScalarData,p,t) = fill!(dz,1.0) # this is r2, and sets uniformly to 1
-ERROR: UndefVarError: ScalarData not defined</code></pre><p>Construct the regularization and interpolation operators in their usual symmetric form, and then set up routines that will provide these operators inside the integrator:</p><pre><code class="language-julia-repl">julia&gt; reg = Regularize(X,Δx;issymmetric=true)
-ERROR: UndefVarError: Regularize not defined
+boundary_constraint_rhs! (generic function with 1 method)</code></pre><p>Construct the regularization and interpolation operators in their usual symmetric form, and then set up routines that will provide these operators inside the integrator:</p><pre><code class="language-julia-repl">julia&gt; reg = Regularize(X,Δx;issymmetric=true)
+Symmetric regularization/interpolation operator with non-filtered interpolation
+  DDF type CartesianGrids.Yang3
+  128 points in grid with cell area 0.000248
 
 julia&gt; Hmat, Emat = RegularizationMatrix(reg,z,w₀)
-ERROR: UndefVarError: RegularizationMatrix not defined
+([0.0 0.0 … 0.0 0.0; 0.0 0.0 … 0.0 0.0; … ; 0.0 0.0 … 0.0 0.0; 0.0 0.0 … 0.0 0.0], [0.0 0.0 … 0.0 0.0; 0.0 0.0 … 0.0 0.0; … ; 0.0 0.0 … 0.0 0.0; 0.0 0.0 … 0.0 0.0])
 
 julia&gt; boundary_constraint_force!(dw::Nodes,z::ScalarData,p) = dw .= Hmat*z # This is B1T
-ERROR: UndefVarError: Nodes not defined
+boundary_constraint_force! (generic function with 1 method)
 
-julia&gt; boundary_constraint_op!(dz::ScalarData,y::Nodes,p) = dz .= Emat*y;  # This is B2
-ERROR: UndefVarError: ScalarData not defined</code></pre><p>Note that these last two functions are also in-place, and return data of the same respective types as <span>$r_1$</span> and <span>$r_2$</span>.</p><p>All of these are assembled into a single <code>ConstrainedODEFunction</code>:</p><pre><code class="language-julia-repl">julia&gt; f = ConstrainedODEFunction(diffusion_rhs!,boundary_constraint_rhs!,boundary_constraint_force!,
+julia&gt; boundary_constraint_op!(dz::ScalarData,y::Nodes,p) = dz .= Emat*y;  # This is B2</code></pre><p>Note that these last two functions are also in-place, and return data of the same respective types as <span>$r_1$</span> and <span>$r_2$</span>.</p><p>All of these are assembled into a single <code>ConstrainedODEFunction</code>:</p><pre><code class="language-julia-repl">julia&gt; f = ConstrainedODEFunction(diffusion_rhs!,boundary_constraint_rhs!,boundary_constraint_force!,
                                  boundary_constraint_op!,L,
                                  _func_cache=u₀)
-ERROR: UndefVarError: u₀ not defined</code></pre><p>With the last argument, we supplied a cache variable to enable evaluation of this function.</p><p>Now set up the problem, using the same basic notation as in <a href="https://github.com/SciML/DifferentialEquations.jl">DifferentialEquations.jl</a>.</p><pre><code class="language-julia-repl">julia&gt; tspan = (0.0,20.0)
+Constrained ODE function of in-place type and static constraints</code></pre><p>With the last argument, we supplied a cache variable to enable evaluation of this function.</p><p>Now set up the problem, using the same basic notation as in <a href="https://github.com/SciML/DifferentialEquations.jl">DifferentialEquations.jl</a>.</p><pre><code class="language-julia-repl">julia&gt; tspan = (0.0,20.0)
 (0.0, 20.0)
 
 julia&gt; prob = ODEProblem(f,u₀,tspan)
-ERROR: UndefVarError: ODEProblem not defined</code></pre><p>Now solve it. We will set the time-step size to a large value (<span>$1.0$</span>) for demonstration purposes. The method remains stable for any choice.</p><pre><code class="language-julia-repl">julia&gt; Δt = 1.0
+[36mODEProblem[0m with uType [36mRecursiveArrayTools.ArrayPartition{Float64,Tuple{CartesianGrids.Nodes{CartesianGrids.Dual,129,129,Float64,Array{Float64,2}},CartesianGrids.ScalarData{128,Float64,Array{Float64,1}}}}[0m and tType [36mFloat64[0m. In-place: [36mtrue[0m
+timespan: (0.0, 20.0)
+u0: CartesianGrids.Dual nodes in a (nx = 129, ny = 129) cell grid of type Float64 data
+  Number of CartesianGrids.Dual nodes: (nx = 129, ny = 129)[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0  …  0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]</code></pre><p>Now solve it. We will set the time-step size to a large value (<span>$1.0$</span>) for demonstration purposes. The method remains stable for any choice.</p><pre><code class="language-julia-repl">julia&gt; Δt = 1.0
 1.0
 
 julia&gt; sol = solve(prob,IFHEEuler(),dt=Δt);
-ERROR: UndefVarError: IFHEEuler not defined</code></pre><p>Now let&#39;s plot it</p><pre><code class="language-julia-repl">julia&gt; xg, yg = coordinates(w₀,dx=Δx);
-ERROR: UndefVarError: coordinates not defined
+ERROR: MethodError: no method matching boundary_constraint_op!(::Array{Float64,1}, ::CartesianGrids.Nodes{CartesianGrids.Dual,129,129,Float64,Array{Float64,2}}, ::DiffEqBase.NullParameters)
+Closest candidates are:
+  boundary_constraint_op!(!Matched::CartesianGrids.ScalarData, ::CartesianGrids.Nodes, ::Any) at none:1</code></pre><p>Now let&#39;s plot it</p><pre><code class="language-julia-repl">julia&gt; xg, yg = coordinates(w₀,dx=Δx);
 
 julia&gt; plot(xg,yg,state(sol.u[end]))
 ERROR: UndefVarError: sol not defined
 
 julia&gt; plot!(xb,yb,linecolor=:black,linewidth=1.5)
-ERROR: UndefVarError: plot! not defined</code></pre><p><img src="ifherk.svg" alt/></p><p>From a side view, we can see that it enforces the boundary condition:</p><pre><code class="language-julia-repl">julia&gt; plot(xg,state(sol.u[end])[65,:],xlabel=&quot;x&quot;,ylabel=&quot;u(x,1)&quot;)
-ERROR: UndefVarError: sol not defined</code></pre><p><img src="ifherk-side.svg" alt/></p><h2 id="Systems-with-variable-constraints"><a class="docs-heading-anchor" href="#Systems-with-variable-constraints">Systems with variable constraints</a><a id="Systems-with-variable-constraints-1"></a><a class="docs-heading-anchor-permalink" href="#Systems-with-variable-constraints" title="Permalink"></a></h2><p>In some cases, the constraint operators may vary with the state vector. A good example of this is a swinging pendulum, with its equations expressed in Cartesian coordinates. The constraint we wish to enforce is that the length of the pendulum is constant: <span>$x^2+y^2 = l^2$</span>. Though not mathematically necessary, it also helps to enforce a tangency condition, <span>$xu + yv = 0$</span>, where <span>$u$</span> and <span>$v$</span> are the rates of change of <span>$x$</span> and <span>$y$</span>. Note that this is simply the derivative of the first constraint. (If expressed in cylindrical coordinates, the constraint is enforced automatically, simply by expressing the equations for <span>$\theta$</span>.)</p><p>The governing equations are</p><p class="math-container">\[\ddt x = u - x \mu ,\, \ddt y = v - y \mu , \, \ddt u = -x \lambda , \, \ddt v = -g - y\lambda\]</p><p>with Lagrange multipliers <span>$\mu$</span> and <span>$\lambda$</span>, and the constraints are</p>$<p>x^2+y^2 = l^2,\, xu + yu = 0$</p><p>These are equivalently expressed as</p><p class="math-container">\[\left[ \begin{array}{cccc} x &amp; y &amp; 0 &amp; 0\end{array}\right]\left[ \begin{array}{c} x \\ y \\ u \\ v \end{array}\right] = l^2\]</p><p>and</p><p class="math-container">\[\left[ \begin{array}{cccc} 0 &amp; 0 &amp; x &amp; y\end{array}\right]\left[ \begin{array}{c} x \\ y \\ u \\ v \end{array}\right] = 0\]</p><p>The operators <span>$B_1^T$</span> and <span>$B_2$</span> are thus</p>$<p>B_1^T = \left[ \begin{array}{cc} x &amp; 0 \ y &amp; 0 \ 0 &amp; x \ 0 &amp; y \end{array}\right]$</p><p>and</p>$<p>B_2 = \left[ \begin{array}{cccc} x &amp; y &amp; 0 &amp; 0 \ 0 &amp; 0 &amp; x &amp; y \end{array}\right]$</p><p>That is, the operators are dependent on the state. In <code>ConstrainedSystems</code>, we handle this by providing a parameter that can be dynamically updated. We will get to that later. First, let&#39;s set up the physical parameters</p><pre><code class="language-julia-repl">julia&gt; l = 1.0
+Plot{Plots.PyPlotBackend() n=3}</code></pre><p><img src="ifherk.svg" alt/></p><p>From a side view, we can see that it enforces the boundary condition:</p><pre><code class="language-julia-repl">julia&gt; plot(xg,state(sol.u[end])[65,:],xlabel=&quot;x&quot;,ylabel=&quot;u(x,1)&quot;)
+ERROR: UndefVarError: sol not defined</code></pre><p><img src="../ifherk-side.svg" alt/></p><h2 id="Systems-with-variable-constraints"><a class="docs-heading-anchor" href="#Systems-with-variable-constraints">Systems with variable constraints</a><a id="Systems-with-variable-constraints-1"></a><a class="docs-heading-anchor-permalink" href="#Systems-with-variable-constraints" title="Permalink"></a></h2><p>In some cases, the constraint operators may vary with the state vector. A good example of this is a swinging pendulum, with its equations expressed in Cartesian coordinates. The constraint we wish to enforce is that the length of the pendulum is constant: <span>$x^2+y^2 = l^2$</span>. Though not mathematically necessary, it also helps to enforce a tangency condition, <span>$xu + yv = 0$</span>, where <span>$u$</span> and <span>$v$</span> are the rates of change of <span>$x$</span> and <span>$y$</span>. Note that this is simply the derivative of the first constraint. (If expressed in cylindrical coordinates, the constraint is enforced automatically, simply by expressing the equations for <span>$\theta$</span>.)</p><p>The governing equations are</p><p class="math-container">\[\ddt x = u - x \mu ,\, \ddt y = v - y \mu , \, \ddt u = -x \lambda , \, \ddt v = -g - y\lambda\]</p><p>with Lagrange multipliers <span>$\mu$</span> and <span>$\lambda$</span>, and the constraints are</p>$<p>x^2+y^2 = l^2,\, xu + yu = 0$</p><p>These are equivalently expressed as</p><p class="math-container">\[\left[ \begin{array}{cccc} x &amp; y &amp; 0 &amp; 0\end{array}\right]\left[ \begin{array}{c} x \\ y \\ u \\ v \end{array}\right] = l^2\]</p><p>and</p><p class="math-container">\[\left[ \begin{array}{cccc} 0 &amp; 0 &amp; x &amp; y\end{array}\right]\left[ \begin{array}{c} x \\ y \\ u \\ v \end{array}\right] = 0\]</p><p>The operators <span>$B_1^T$</span> and <span>$B_2$</span> are thus</p>$<p>B_1^T = \left[ \begin{array}{cc} x &amp; 0 \ y &amp; 0 \ 0 &amp; x \ 0 &amp; y \end{array}\right]$</p><p>and</p>$<p>B_2 = \left[ \begin{array}{cccc} x &amp; y &amp; 0 &amp; 0 \ 0 &amp; 0 &amp; x &amp; y \end{array}\right]$</p><p>That is, the operators are dependent on the state. In <code>ConstrainedSystems</code>, we handle this by providing a parameter that can be dynamically updated. We will get to that later. First, let&#39;s set up the physical parameters</p><pre><code class="language-julia-repl">julia&gt; l = 1.0
 1.0
 
 julia&gt; g = 1.0
@@ -77,7 +80,7 @@ julia&gt; z₀ = Float64[0.0, 0.0] # Lagrange multipliers
  0.0
 
 julia&gt; u₀ = solvector(state=y₀,constraint=z₀)
-ERROR: UndefVarError: solvector not defined</code></pre><p>Now, we will set up the basic form of the constraint operators and assemble these with the other parameters with the help of a type we&#39;ll define here:</p><pre><code class="language-julia-repl">julia&gt; struct ProblemParams{P,BT1,BT2}
+([1.0, -6.123233995736766e-17, 0.0, 0.0], [0.0, 0.0])</code></pre><p>Now, we will set up the basic form of the constraint operators and assemble these with the other parameters with the help of a type we&#39;ll define here:</p><pre><code class="language-julia-repl">julia&gt; struct ProblemParams{P,BT1,BT2}
            params :: P
            B₁ᵀ :: BT1
            B₂ :: BT2
@@ -134,19 +137,20 @@ length_constraint_op! (generic function with 1 method)</code></pre><p>Now, we ne
 update_p! (generic function with 1 method)</code></pre><p>Finally, assemble all of them together:</p><pre><code class="language-julia-repl">julia&gt; f = ConstrainedODEFunction(pendulum_rhs!,length_constraint_rhs!,length_constraint_force!,
                                        length_constraint_op!,
                                       _func_cache=deepcopy(u₀),param_update_func=update_p!)
-ERROR: UndefVarError: u₀ not defined</code></pre><p>Now solve the system</p><pre><code class="language-julia-repl">julia&gt; tspan = (0.0,10.0)
+Constrained ODE function of in-place type and variable constraints</code></pre><p>Now solve the system</p><pre><code class="language-julia-repl">julia&gt; tspan = (0.0,10.0)
 (0.0, 10.0)
 
 julia&gt; prob = ODEProblem(f,u₀,tspan,p₀)
-ERROR: UndefVarError: ODEProblem not defined
+[36mODEProblem[0m with uType [36mRecursiveArrayTools.ArrayPartition{Float64,Tuple{Array{Float64,1},Array{Float64,1}}}[0m and tType [36mFloat64[0m. In-place: [36mtrue[0m
+timespan: (0.0, 10.0)
+u0: [1.0, -6.123233995736766e-17, 0.0, 0.0][0.0, 0.0]
 
 julia&gt; Δt = 1e-2
 0.01
 
-julia&gt; sol = solve(prob,LiskaIFHERK(),dt=Δt);
-ERROR: UndefVarError: LiskaIFHERK not defined</code></pre><p>Plot the solution</p><pre><code class="language-julia-repl">julia&gt; plot(sol.t,sol[1,:],label=&quot;x&quot;,xlabel=&quot;t&quot;)
-ERROR: UndefVarError: sol not defined
+julia&gt; sol = solve(prob,LiskaIFHERK(),dt=Δt);</code></pre><p>Plot the solution</p><pre><code class="language-julia-repl">julia&gt; plot(sol.t,sol[1,:],label=&quot;x&quot;,xlabel=&quot;t&quot;)
+Plot{Plots.PyPlotBackend() n=1}
 
 julia&gt; plot!(sol.t,sol[2,:],label=&quot;y&quot;)
-ERROR: UndefVarError: sol not defined</code></pre><p><img src="pendulum.svg" alt/></p><p>and here is the trajectory</p><pre><code class="language-julia-repl">julia&gt; plot(sol[1,:],sol[2,:],ratio=1,legend=:false,title=&quot;Trajectory&quot;)
-ERROR: UndefVarError: sol not defined</code></pre><p><img src="pendulum-traj.svg" alt/></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../saddlesystems/">« Saddle point systems</a><a class="docs-footer-nextpage" href="../methods/">Index »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> on <span class="colophon-date" title="Thursday 31 December 2020 01:31">Thursday 31 December 2020</span>. Using Julia version 1.5.3.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+Plot{Plots.PyPlotBackend() n=2}</code></pre><p><img src="../pendulum.svg" alt/></p><p>and here is the trajectory</p><pre><code class="language-julia-repl">julia&gt; plot(sol[1,:],sol[2,:],ratio=1,legend=:false,title=&quot;Trajectory&quot;)
+Plot{Plots.PyPlotBackend() n=1}</code></pre><p><img src="../pendulum-traj.svg" alt/></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../saddlesystems/">« Saddle point systems</a><a class="docs-footer-nextpage" href="../methods/">Index »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> on <span class="colophon-date" title="Thursday 31 December 2020 01:52">Thursday 31 December 2020</span>. Using Julia version 1.5.3.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
