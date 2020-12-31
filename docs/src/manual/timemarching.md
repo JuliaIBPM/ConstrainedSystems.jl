@@ -158,7 +158,7 @@ $$\ddt x = u - x \mu ,\, \ddt y = v - y \mu , \, \ddt u = -x \lambda , \, \ddt v
 
 with Lagrange multipliers $\mu$ and $\lambda$, and the constraints are
 
-$$ x^2+y^2 = l^2,\, xu + yu = 0$$
+$$x^2+y^2 = l^2,\, xu + yu = 0$$
 
 These are equivalently expressed as
 
@@ -170,11 +170,11 @@ $$\left[ \begin{array}{cccc} 0 & 0 & x & y\end{array}\right]\left[ \begin{array}
 
 The operators $B_1^T$ and $B_2$ are thus
 
-$$ B_1^T = \left[ \begin{array}{cc} x & 0 \\ y & 0 \\ 0 & x \\ 0 & y \end{array}\right]$$
+$$B_1^T = \left[ \begin{array}{cc} x & 0 \\ y & 0 \\ 0 & x \\ 0 & y \end{array}\right]$$
 
 and
 
-$$ B_2 = \left[ \begin{array}{cccc} x & y & 0 & 0 \\ 0 & 0 & x & y \end{array}\right]$$
+$$B_2 = \left[ \begin{array}{cccc} x & y & 0 & 0 \\ 0 & 0 & x & y \end{array}\right]$$
 
 That is, the operators are dependent on the state. In `ConstrainedSystems`, we handle this
 by providing a parameter that can be dynamically updated. We will get to that later. First,
@@ -285,7 +285,7 @@ savefig("pendulum.svg"); nothing # hide
 and here is the trajectory
 
 ```@repl march
-plot(sol[1,:],sol[2,:],ratio=1,legend=:false,title="Trajectory")
+plot(sol[1,:],sol[2,:],ratio=1,legend=:false,title="Trajectory",xlabel="x",ylabel="y")
 savefig("pendulum-traj.svg"); nothing # hide
 ```
 ![](pendulum-traj.svg)
