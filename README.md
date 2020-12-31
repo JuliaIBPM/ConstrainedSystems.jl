@@ -6,7 +6,7 @@ _Tools for solving constrained dynamical systems_
 | [![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://JuliaIBPM.github.io/ConstrainedSystems.jl/stable) [![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://JuliaIBPM.github.io/ConstrainedSystems.jl/dev) | [![Build Status](https://github.com/JuliaIBPM/ConstrainedSystems.jl/workflows/CI/badge.svg)](https://github.com/JuliaIBPM/ConstrainedSystems.jl/actions) [![Coverage](https://codecov.io/gh/JuliaIBPM/ConstrainedSystems.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/JuliaIBPM/ConstrainedSystems.jl) |
 
 
-This package contains several tools for solving and advancing (large-scale) dynamical systems with constraints. These systems generically have the form
+This package contains several tools for solving and advancing (large-scale) dynamical systems with constraints. These systems generically have the form 
 
 dy/dt = L y - B<sub>1</sub><sup>T</sup> z + r<sub>1</sub>(y,t)
 
