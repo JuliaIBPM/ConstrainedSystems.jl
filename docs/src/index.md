@@ -17,7 +17,8 @@ This package contains several tools for solving and advancing (large-scale) dyna
 
 $$\ddt{y} = L u - B_{1}^{T} z + r_{1}(y,t), \quad B_{2} y = r_{2}(t), \quad y(0) = y_{0}$$
 
-where $y$ is a state vector, $L$ is a linear operator with an associated matrix exponential (integrating factor), and $z$ is a constraint force vector (i.e., Lagrange multipliers).
+where $y$ is a state vector, $L$ is a linear operator with an associated matrix exponential (integrating factor), and $z$ is a constraint force vector (i.e., Lagrange multipliers). Systems of this type might arise from, e.g., incompressible fluid dynamics, rigid-body mechanics,
+or couplings of such systems.
 
 Some of the key components of this package are
 
@@ -32,8 +33,8 @@ through the use of a variable parameter argument and an associated parameter upd
 function.
 
 * The ability to add an auxiliary (unconstrained) system of equations that the
-constraint operators B<sub>1</sub><sup>T</sup> and B<sub>2</sub> depend upon.
-The package is agnostic to the type of systems, and might arise from, e.g., fluid dynamics or rigid-body mechanics.
+constraint operators $B_1^T$ and $B_2$ depend upon.
+
 
 ## Installation
 
