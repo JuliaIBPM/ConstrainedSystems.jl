@@ -21,8 +21,8 @@ correspond to an unconstrained system. (`aux_state` is ignored in this situation
 """
 solvector(;state=nothing,constraint=nothing,aux_state=nothing) = _solvector(state,constraint,aux_state)
 _solvector(::Nothing,::Nothing,::Nothing) = nothing
-_solvector(s,::Nothing,::Nothing) = ArrayPartition(s,empty(s))
-_solvector(s,::Nothing,aux) = ArrayPartition(s,empty(s))
+_solvector(s,::Nothing,::Nothing) = ArrayPartition(s,_empty(s))
+_solvector(s,::Nothing,aux) = ArrayPartition(s,_empty(s))
 _solvector(s,c,::Nothing) = ArrayPartition(s,c)
 #_solvector(s,c,aux) = ArrayPartition(_solvector(s,c,nothing),aux)
 _solvector(s,c,aux) = ArrayPartition(s,c,aux)
@@ -31,7 +31,7 @@ _solvector(s,c,aux) = ArrayPartition(s,c,aux)
 mainvector(u) = u
 mainvector(u::ArrayPartition) = ArrayPartition(u.x[1],u.x[2])
 
-
+_empty(s) = Vector{eltype(s)}()
 
 
 """

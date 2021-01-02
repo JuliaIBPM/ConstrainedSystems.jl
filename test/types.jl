@@ -24,6 +24,9 @@ x = randn(na)
   @test aux_state(u) == nothing
   @test mainvector(u) == ArrayPartition(y,empty(y))
 
+  e = _empty(y)
+  @test isempty(e)
+
 end
 
 @testset "Function structure" begin
