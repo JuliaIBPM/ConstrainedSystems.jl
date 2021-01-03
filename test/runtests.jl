@@ -1,6 +1,8 @@
 
 using ConstrainedSystems
 using Test
+using CartesianGrids
+using LinearAlgebra
 
 include("utils.jl")
 include("types.jl")

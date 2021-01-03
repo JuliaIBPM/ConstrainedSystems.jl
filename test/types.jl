@@ -24,8 +24,27 @@ x = randn(na)
   @test aux_state(u) == nothing
   @test mainvector(u) == ArrayPartition(y,empty(y))
 
-  e = _empty(y)
+  e = ConstrainedSystems._empty(y)
   @test isempty(e)
+
+end
+
+struct MyType{F}
+  x :: F
+end
+
+struct MyType2{F}
+  x :: F
+end
+
+@testset "Solution structure with user type" begin
+
+  a = MyType(x)
+  b = MyType2(y)
+  @test isempty(ConstrainedSystems._empty(a))
+  u = solvector(state=a)
+  u = solvector(state=a,constraint=b)
+  u = solvector(state=a,constraint=b,aux_state=a)
 
 end
 

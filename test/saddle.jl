@@ -1,6 +1,3 @@
-using CartesianGrids
-using LinearAlgebra
-
 @testset "Saddle-Point Systems" begin
 
   @testset "Matrix tests" begin
