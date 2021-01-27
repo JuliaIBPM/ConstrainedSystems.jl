@@ -2,7 +2,7 @@ name = "ConstrainedSystems"
 uuid = "c257ce95-4918-4279-a47c-50fdbcb74a04"
 authors = ["Jeff Eldredge <jdeldre@g.ucla.edu>"]
 repo = "https://github.com/JuliaIBPM/ConstrainedSystems.jl.git"
-version = "0.2.2"
+version = "0.2.3"
 
 [deps]
 BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
@@ -16,7 +16,7 @@ Reexport = "189a3867-3050-52da-a836-e630ba90ab69"
 
 [compat]
 BenchmarkTools = "0.5"
-IterativeSolvers = "0.8"
+IterativeSolvers = "0.8, 0.9"
 LinearMaps = "^2.4, 3.2"
 OrdinaryDiffEq = "5.47"
 PkgBenchmark = "0.2.10"
