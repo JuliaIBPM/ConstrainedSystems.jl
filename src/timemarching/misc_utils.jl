@@ -40,7 +40,14 @@ import OrdinaryDiffEq.DiffEqBase: UNITLESS_ABS2, ODE_DEFAULT_NORM, recursive_len
 
 
 zero_vec!(::Nothing) = nothing
-zero_vec!(x) = fill!(x,0.0)
+zero_vec!(u) = fill!(u,0.0)
+function zero_vec!(u::ArrayPartition)
+    for x in u.x
+        fill!(x,0.0)
+    end
+    return nothing
+end
+
 
 
 function recursivecopy!(dest :: T, src :: T) where {T}
@@ -59,7 +66,6 @@ function recursivecopy!(dest :: AbstractArray{T}, src :: AbstractArray{T}) where
     end
     return dest
 end
-
 
 
 # Seed the state vector with two sets of random values, apply the constraint operator on a

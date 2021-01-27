@@ -219,7 +219,7 @@ _complete_r1(r1,::Val{true},_func_cache) = (du,u,p,t) -> (dy = state(du); r1(dy,
 _complete_r1(r1,::Val{false},_func_cache) = (u,p,t) -> (du = deepcopy(u); zero_vec!(du); state(du) .= r1(state(u),p,t); return du)
 _complete_r1(r1::ArrayPartition,::Val{true},_func_cache) =
             SplitFunction((du,u,p,t) ->(dy = state(du); dx = aux_state(du); zero_vec!(dx); state_r1(r1)(dy,state(u),p,t)),
-                          (du,u,p,t) ->(dy = state(du); dx = aux_state(du); fill!(dy,0.0); aux_r1(r1)(dx,aux_state(u),p,t));
+                          (du,u,p,t) ->(dy = state(du); dx = aux_state(du); zero_vec!(dy); aux_r1(r1)(dx,aux_state(u),p,t));
                           _func_cache=deepcopy(_func_cache))
 _complete_r1(r1::ArrayPartition,::Val{false},_func_cache) =
             SplitFunction((u,p,t) -> (du = deepcopy(u); zero_vec!(du); state(du) .= state_r1(r1)(state(u),p,t); return du),
@@ -240,8 +240,8 @@ _complete_B2(::Nothing,::Val{true},_func_cache) = (du,u,p,t) -> zero_vec!(constr
 _complete_B2(B2,::Val{false},_func_cache) = (u,p,t) -> (du = deepcopy(u); zero_vec!(du); constraint(du) .= -B2(state(u),p); return du)
 
 function (f::ConstrainedODEFunction)(du,u,p,t)
-    fill!(f.cache,0.0)
-    fill!(du,0.0)
+    zero_vec!(f.cache)
+    zero_vec!(du)
     f.odef(f.cache,u,p,t)
     f.conf(du,u,p,t)
     du .+= f.cache

@@ -3,12 +3,12 @@
 function SaddleSystem(A,f::ConstrainedODEFunction{true},p,pold,ducache,solver)
     nully, nullz = state(ducache), constraint(ducache)
     du_aux = aux_state(ducache)
-    @inline B₁ᵀ(z) = (fill!(ducache,0.0);
+    @inline B₁ᵀ(z) = (zero_vec!(ducache);
                      _ode_neg_B1!(ducache,f,solvector(state=nully,constraint=z,aux_state=du_aux),pold,0.0);
-                     ducache .*= -1.0; return state(ducache))
-    @inline B₂(y) = (fill!(ducache,0.0);
+                     state(ducache) .*= -1.0; return state(ducache))
+    @inline B₂(y) = (zero_vec!(ducache);
                      _constraint_neg_B2!(ducache,f,solvector(state=y,constraint=nullz,aux_state=du_aux),p,0.0);
-                     ducache .*= -1.0; return constraint(ducache))
+                     constraint(ducache) .*= -1.0; return constraint(ducache))
     SaddleSystem(A,B₂,B₁ᵀ,mainvector(ducache),solver=solver)
 end
 
@@ -18,10 +18,10 @@ function SaddleSystem(A,f::ConstrainedODEFunction{false},p,pold,ducache,solver)
     nully, nullz = state(ducache), constraint(ducache)
     du_aux = aux_state(ducache)
     @inline B₁ᵀ(z) = (zero_vec!(ducache); ducache .= _ode_neg_B1(f,solvector(state=nully,constraint=z,aux_state=du_aux),pold,0.0);
-                     ducache .*= -1.0; return state(ducache))
+                     state(ducache) .*= -1.0; return state(ducache))
     @inline B₂(y) = (zero_vec!(ducache);
                      ducache .= _constraint_neg_B2(f,solvector(state=y,constraint=nullz,aux_state=du_aux),p,0.0);
-                     ducache .*= -1.0; return constraint(ducache))
+                     constraint(ducache) .*= -1.0; return constraint(ducache))
     SaddleSystem(A,B₂,B₁ᵀ,mainvector(ducache),solver=solver)
 end
 
