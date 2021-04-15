@@ -92,6 +92,9 @@ aux_r1(r1) = nothing
 aux_r1(r1::ArrayPartition) = r1.x[2]
 
 
+#=
+Not needed?? 
+
 # To extend interpolation to ArrayPartition but preserve the types of entries
 Base.BroadcastStyle(::Type{<:ArrayPartition}) = Broadcast.ArrayStyle{ArrayPartition}()
 
@@ -155,3 +158,4 @@ unpack(x::ArrayPartition, i) = x.x[i]
 @inline unpack_args(i, args::Tuple) = (unpack(args[1], i), unpack_args(i, Base.tail(args))...)
 unpack_args(i, args::Tuple{Any}) = (unpack(args[1], i),)
 unpack_args(::Any, args::Tuple{}) = ()
+=#
