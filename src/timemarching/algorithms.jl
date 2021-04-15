@@ -424,7 +424,8 @@ end
       err = internalnorm(udiff,ttmp)
       #println("error = ",err)
     end
-    @.. constraint(u) /= (dt*ã33)
+    z = constraint(u)
+    @.. z /= (dt*ã33)
 
     # Final steps
     integrator.p = param_update_func(u,ptmp,t)
@@ -559,7 +560,8 @@ end
     err = internalnorm(udiff,t+dt)
     #println("error = ",err)
   end
-  @.. constraint(u) /= dt
+  z = constraint(u)
+  @.. z /= dt
 
   # Final steps
   integrator.p = param_update_func(u,pold_ptr,t)

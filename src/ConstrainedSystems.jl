@@ -23,7 +23,7 @@ import RecursiveArrayTools: recursivecopy, recursivecopy!, recursive_mean
 using LinearAlgebra
 import LinearAlgebra: ldiv!, mul!, *, \, I
 
-import Base: size, eltype
+import Base: size, eltype, *, /, +, -
 
 export SaddleSystem, SaddleVector, state, constraint, aux_state, linear_map
 export solvector, mainvector
