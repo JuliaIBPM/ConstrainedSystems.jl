@@ -71,8 +71,8 @@ end
 abstract type Direct <: SchurSolverType end
 
 function _schur_inverse_function(S,T,M,::Type{Direct},kwargs...)
-  Sfact = factorize(Matrix(S))
-  return LinearMap{T}(x -> Sfact\x,M)
+  #Sfact = factorize(Matrix(S))
+  return LinearMap{T}(x -> ((y,_) = linsolve(S,x); y) ,M)
 end
 
 macro createsolver(stype)
@@ -103,7 +103,7 @@ function SaddleSystem(A::AbstractMatrix{T},B₂::AbstractMatrix{T},B₁ᵀ::Abst
                       C::AbstractMatrix{T};solver::Type{TS}=Direct,filter=I,kwargs...) where {T,TS<:SchurSolverType}
 
     Afact = factorize(A)
-    Ainv = LinearMap{T}(x -> Afact\x,size(A,1))
+    Ainv = LinearMap{T}((y,x) -> y .= Afact\x,size(A,1))
 
     return SaddleSystem(LinearMap{T}(A),LinearMap{T}(B₂),LinearMap{T}(B₁ᵀ),
                         LinearMap{T}(C),Ainv,linear_map(filter,zeros(T,size(C,1)),eltype=T),
