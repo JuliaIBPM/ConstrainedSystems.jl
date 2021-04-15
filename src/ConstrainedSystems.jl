@@ -34,6 +34,7 @@ include("vectors.jl")
 include("saddlepoint/saddlesystems.jl")
 include("saddlepoint/linearmaps.jl")
 include("saddlepoint/arithmetic.jl")
+include("saddlepoint/testproblems.jl")
 
 
 include("timemarching/types.jl")

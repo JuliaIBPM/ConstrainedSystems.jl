@@ -1,5 +1,12 @@
 ### LINEAR MAP CONSTRUCTION
 
+#=
+Need to make in-place versions of these, for example, by supplying input and output
+types and using the output type as cache:
+_create_vec_backslash!(v::TV,A,u::TU) where {TU,TV} = (y,x) -> (ldiv!(v,A,_wrap_vec(x,u)); y .= _unwrap_vec(v))
+
+=#
+
 # for a given function of function-like object A, which acts upon data of type `input`
 # and returns data of type `output`
 # return a LinearMap that acts upon a vector form of u
@@ -70,6 +77,9 @@ _create_vec_backslash(A,u::TU) where {TU} = (x -> _unwrap_vec(A\_wrap_vec(x,u)))
 # wrap the vector x in type u, unless u is already a subtype of AbstractVector,
 # in which case it just keeps it as is.
 _wrap_vec(x::AbstractVector{T},u::TU) where {T,TU} = TU(reshape(x,size(u)...))
+
+_wrap_vec(x::AbstractVector{T},u::AbstractVector{U}) where {T,U} = x
+
 
 # if the vector x is simply a reshaped form of type u, then just get the
 # parent of x
