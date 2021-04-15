@@ -7,6 +7,16 @@ y = randn(ns)
 z = randn(nc)
 x = randn(na)
 
+struct MyType{T} <: AbstractVector{T}
+    data :: T
+end
+Base.similar(A::MyType{T}) where {T} = MyType{T}(similar(A.data))
+Base.size(A::MyType) = size(A.data)
+Base.getindex(A::MyType, i::Int) = getindex(A.data,i)
+Base.setindex!(A::MyType, v, i::Int) = setindex!(A.data,v,i)
+Base.IndexStyle(::MyType) = IndexLinear()
+
+
 @testset "Solution structure" begin
 
   u = solvector(state=y,constraint=z)
@@ -27,9 +37,31 @@ x = randn(na)
   e = ConstrainedSystems._empty(y)
   @test isempty(e)
 
+  u2 = solvector(state=MyType(zero(y)),constraint=zero(z),aux_state=zero(x))
+  u2p = u2 .+ 1
+  @test typeof(state(u2p)) <: MyType
+  @test typeof(constraint(u2p)) <: typeof(z)
+  @test typeof(aux_state(u2p)) <: typeof(x)
+  @test state(u2p) == MyType(fill(1.0,size(y)))
+  @test constraint(u2p) == fill(1.0,size(z))
+  @test aux_state(u2p) == fill(1.0,size(x))
+
+
+  u2m = u2p .* 2
+  @test typeof(state(u2m)) <: MyType
+  @test state(u2m) == MyType(fill(2.0,size(y)))
+  @test constraint(u2m) == fill(2.0,size(z))
+  @test aux_state(u2m) == fill(2.0,size(x))
+
+  u2m = similar(u2p)
+  u2m .= u2p .* 2 .- 3 .+ u2p ./ 2
+  @test state(u2m) == MyType(fill(-0.5,size(y)))
+  @test constraint(u2m) == fill(-0.5,size(z))
+  @test aux_state(u2m) == fill(-0.5,size(x))
+
 end
 
-struct MyType{F}
+struct MyType1{F}
   x :: F
 end
 
@@ -39,7 +71,7 @@ end
 
 @testset "Solution structure with user type" begin
 
-  a = MyType(x)
+  a = MyType1(x)
   b = MyType2(y)
   @test isempty(ConstrainedSystems._empty(a))
   u = solvector(state=a)
