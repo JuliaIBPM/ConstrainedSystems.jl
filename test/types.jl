@@ -1,4 +1,3 @@
-using LinearAlgebra
 
 ns = 5
 nc = 3
@@ -8,13 +7,32 @@ z = randn(nc)
 x = randn(na)
 
 struct MyType{T} <: AbstractVector{T}
-    data :: T
+    data :: Vector{T}
 end
 Base.similar(A::MyType{T}) where {T} = MyType{T}(similar(A.data))
+Base.similar(A::MyType{T},::Type{S}) where {T,S} = MyType(similar(A.data,S))
 Base.size(A::MyType) = size(A.data)
 Base.getindex(A::MyType, i::Int) = getindex(A.data,i)
 Base.setindex!(A::MyType, v, i::Int) = setindex!(A.data,v,i)
 Base.IndexStyle(::MyType) = IndexLinear()
+
+Base.BroadcastStyle(::Type{<:MyType}) = Broadcast.ArrayStyle{MyType}()
+
+
+function Base.similar(bc::Broadcast.Broadcasted{Broadcast.ArrayStyle{MyType}},::Type{T}) where {T}
+    similar(find_mt(bc),T)
+end
+
+function Base.similar(bc::Broadcast.Broadcasted{Broadcast.ArrayStyle{MyType}})
+    similar(find_mt(bc))
+end
+
+find_mt(bc::Base.Broadcast.Broadcasted) = find_mt(bc.args)
+find_mt(args::Tuple) = find_mt(find_mt(args[1]), Base.tail(args))
+find_mt(x) = x
+find_mt(::Tuple{}) = nothing
+find_mt(a::MyType, rest) = a
+find_mt(::Any, rest) = find_mt(rest)
 
 
 @testset "Solution structure" begin

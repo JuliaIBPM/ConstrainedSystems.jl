@@ -1,4 +1,3 @@
-import ConstrainedSystems: recursivecopy!, needs_iteration, ArrayPartition
 
 const MAXMEM = 100
 
