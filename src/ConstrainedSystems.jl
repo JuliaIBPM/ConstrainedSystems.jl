@@ -1,8 +1,9 @@
 module ConstrainedSystems
 
 using LinearMaps
+using KrylovKit
 using RecursiveArrayTools
-using IterativeSolvers
+#using IterativeSolvers
 #using UnPack
 using Reexport
 @reexport using OrdinaryDiffEq
@@ -27,13 +28,14 @@ import Base: size, eltype, *, /, +, -
 
 export SaddleSystem, SaddleVector, state, constraint, aux_state, linear_map
 export solvector, mainvector
-export SchurSolverType, Direct, CG, BiCG, GMRES
+export SchurSolverType, Direct, CG, GMRES, Iterative
 
 
 include("vectors.jl")
 include("saddlepoint/saddlesystems.jl")
 include("saddlepoint/linearmaps.jl")
 include("saddlepoint/arithmetic.jl")
+include("saddlepoint/testproblems.jl")
 
 
 include("timemarching/types.jl")
