@@ -53,6 +53,12 @@ to the unconstrained system described by operator `A`.
 
 The list of vectors `u` and `f` in any of these constructors can be bundled together
 as a [`SaddleVector`](@ref), e.g. `SaddleSystem(A,B₂,B₁ᵀ,SaddleVector(u,f))`.
+
+An optional keyword argument `solver=` can be used to specify the type of
+solution for the Schur complement system. By default, this is set to `Direct`,
+and the Schur complement matrix is formed, factorized, and stored. This can be
+changed to `Iterative`, in which case an iterative solver is determined
+by the `lin_solve` function of [`KrylovKit.jl`](https://github.com/Jutho/KrylovKit.jl).
 """
 function SaddleSystem(A::LinearMap{T},B₂::LinearMap{T},B₁ᵀ::LinearMap{T},C::LinearMap{T},
                       A⁻¹::LinearMap{T},P::LinearMap{T},TU,TF;solver::Type{TS}=Direct,kwargs...) where {T,TS<:SchurSolverType}
@@ -71,7 +77,13 @@ end
 abstract type Direct <: SchurSolverType end
 
 function _schur_inverse_function(S,T,M,::Type{Direct},kwargs...)
-  #Sfact = factorize(Matrix(S))
+  Sfact = factorize(Matrix(S))
+  return LinearMap{T}(x -> Sfact\x,M)
+end
+
+abstract type Iterative <: SchurSolverType end
+
+function _schur_inverse_function(S,T,M,::Type{Iterative},kwargs...)
   return LinearMap{T}(x -> ((y,_) = linsolve(S,x); y) ,M)
 end
 
@@ -121,11 +133,10 @@ SaddleSystem(A::AbstractMatrix{T},B₂::AbstractMatrix{T},B₁ᵀ::AbstractMatri
 # There should already be an \ operator associated with A
 # NOTE: should change default value of eltype to eltype(u)
 function SaddleSystem(A,B₂,B₁ᵀ,C,u::TU,f::TF;eltype=Float64,filter=I,solver::Type{TS}=Direct,kwargs...) where {TU,TF,TS<:SchurSolverType}
-
     return SaddleSystem(linear_map(A,u,eltype=eltype),linear_map(B₂,u,f,eltype=eltype),
                         linear_map(B₁ᵀ,f,u,eltype=eltype),
                         linear_map(C,f,eltype=eltype),
-                        linear_inverse_map(A,u,eltype=eltype),
+                        linear_inverse_map!(A,u,eltype=eltype),
                         linear_map(filter,f,eltype=eltype),TU,TF;solver=solver,kwargs...)
 end
 

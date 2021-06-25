@@ -76,14 +76,13 @@ function ldiv!(sol::Union{Tuple{AbstractVector{T},AbstractVector{T}},AbstractVec
               rhs::Union{Tuple{AbstractVector{T},AbstractVector{T}},AbstractVectorOfArray{T}}) where {T,Ns,Nc}
     @unpack A⁻¹, B₂, B₁ᵀ, B₂A⁻¹r₁, P, S⁻¹, _f_buf, A⁻¹B₁ᵀf = sys
 
-
     N = Ns+Nc
     u,f = sol
     r₁,r₂ = rhs
     length(u) == length(r₁) == Ns || error("Incompatible number of elements")
     length(f) == length(r₂) == Nc || error("Incompatible number of elements")
 
-    u .= A⁻¹*r₁
+    mul!(u,A⁻¹,r₁)
 
     B₂A⁻¹r₁ .= B₂*u
     _f_buf .= r₂
@@ -95,6 +94,7 @@ function ldiv!(sol::Union{Tuple{AbstractVector{T},AbstractVector{T}},AbstractVec
     end
     A⁻¹B₁ᵀf .= A⁻¹*B₁ᵀ*f
     u .-= A⁻¹B₁ᵀf
+
 
     return sol
 end

@@ -24,6 +24,11 @@ function linear_inverse_map(A,input;eltype=Float64)
     hasmethod(\,Tuple{typeof(A),typeof(input)}) || error("No such backslash operator exists")
     return LinearMap{eltype}(_create_vec_backslash(A,input),length(input))
 end
+function linear_inverse_map!(A,input;eltype=Float64)
+    hasmethod(ldiv!,Tuple{typeof(input),typeof(A),typeof(input)}) || error("No such ldiv! operator exists")
+    return LinearMap{eltype}(_create_vec_backslash!(A,input),length(input))
+end
+
 linear_inverse_map(A::SaddleSystem{T,Ns,Nc},::Any;eltype=Float64) where {T,Ns,Nc} = LinearMap{T}(x->A\x,Ns+Nc)
 
 # Square operators. input of zero length
@@ -72,14 +77,18 @@ end
 _create_vec_multiplication(A,u::TU) where {TU} = (x -> _unwrap_vec(A*_wrap_vec(x,u)))
 _create_vec_function(A,u::TU) where {TU} = (x -> _unwrap_vec(A(_wrap_vec(x,u))))
 _create_vec_backslash(A,u::TU) where {TU} = (x -> _unwrap_vec(A\_wrap_vec(x,u)))
+_create_vec_backslash!(A,u::TU) where {TU} = (y,x) -> (_ywrap = _wrap_vec(y,u); ldiv!(_ywrap,A,_wrap_vec(x,u)); y)
+_create_vec_backslash!(A::UniformScaling,u::TU) where {TU} = (y,x) -> (_wrap_vec(y,u) .= A\_wrap_vec(x,u))
+_create_vec_backslash!(A::AbstractMatrix,u::TU) where {TU} = (Afact = factorize(A); (y,x) -> (_ywrap = _wrap_vec(y,u); _ywrap .= Afact\_wrap_vec(x,u)))
+
+
 
 #### WRAPPERS ####
 # wrap the vector x in type u, unless u is already a subtype of AbstractVector,
 # in which case it just keeps it as is.
 _wrap_vec(x::AbstractVector{T},u::TU) where {T,TU} = TU(reshape(x,size(u)...))
-
-_wrap_vec(x::AbstractVector{T},u::AbstractVector{U}) where {T,U} = x
-
+#_wrap_vec(x::AbstractVector{T},u::AbstractVector{U}) where {T,U} = x
+_wrap_vec(x::Vector{T},u::Vector{T}) where {T} = x
 
 # if the vector x is simply a reshaped form of type u, then just get the
 # parent of x

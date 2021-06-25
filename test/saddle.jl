@@ -163,8 +163,8 @@
 
   @testset "Vector force data" begin
 
-    B₁ᵀ(f) = Curl()*(Hvmat*f)
-    B₂(w) = -(Evmat*(Curl()*(L\w)))
+    B₁ᵀ(f) = curl(Hvmat*f)
+    B₂(w) = -(Evmat*(curl(L\w)))
 
     rhsv = SaddleVector(w,fv)
     A = SaddleSystem(I,B₂,B₁ᵀ,rhsv)
