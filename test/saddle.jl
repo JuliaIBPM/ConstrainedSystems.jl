@@ -56,6 +56,7 @@
   Lx = 2.0
   dx = Lx/(nx-2)
   w = Nodes(Dual,(nx,ny))
+  q = Edges(Primal,w)
 
   L = plan_laplacian(size(w),with_inverse=true)
 
@@ -79,6 +80,8 @@
     w .= rand(size(w)...)
 
     uvec = zeros(length(w))
+
+
 
     Lop = ConstrainedSystems.linear_map(L,w)
 
@@ -115,6 +118,31 @@
     gvec = Eop*vec(w)
 
     @test ConstrainedSystems._wrap_vec(gvec,g) == g
+
+    # Test in-place function wrapping
+    my_ip_fcn!(outp::Vector,inp::Vector) = outp .= 2.0*inp
+    inp = rand(1000)
+    outp = zero(inp)
+    my_ip_fcn!(outp,inp)
+
+    my_ip_lm! = ConstrainedSystems._create_vec_function!(my_ip_fcn!,outp,inp)
+    outp2 = zero(inp)
+    my_ip_lm!(outp2,inp)
+    @test outp2 == outp
+
+    curl_lm! = ConstrainedSystems._create_vec_function!(CartesianGrids.curl!,q,w)
+    CartesianGrids.curl!(q,w)
+
+    uvec .= wvec
+    qvec = zeros(length(q))
+    curl_lm!(qvec,uvec)
+
+    @test ConstrainedSystems._wrap_vec(qvec,q) == q
+
+    curl_lm! = ConstrainedSystems.linear_map(CartesianGrids.curl!,w,q)
+    mul!(qvec,curl_lm!,uvec)
+
+    @test ConstrainedSystems._wrap_vec(qvec,q) == q
 
   end
 
