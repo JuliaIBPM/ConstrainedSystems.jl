@@ -1,10 +1,12 @@
 ### LINEAR MAP CONSTRUCTION
 
 #=
-Need to make in-place versions of these, for example, by supplying input and output
-types and using the output type as cache:
-_create_vec_backslash!(v::TV,A,u::TU) where {TU,TV} = (y,x) -> (ldiv!(v,A,_wrap_vec(x,u)); y .= _unwrap_vec(v))
+If a function is already in-place, then `linear_map` will preserve this, so, e.g,
 
+f_lm = linear_map(f,input,output)
+mul!(output_vec,f_lm,input_vec)
+
+will produce the same effect as f(output,input), but on vectors
 =#
 
 # for a given function of function-like object A, which acts upon data of type `input`
@@ -53,16 +55,17 @@ _linear_map(A,input,output,eltype,::Val{N},::Val{0}) where {N} =
 
 # non-zero lengths of input and output
 _linear_map(A,input,output,eltype,::Val{N},::Val{M}) where {N,M} =
-      LinearMap{eltype}(_create_fcn(A,input),length(output),length(input))
+      LinearMap{eltype}(_create_fcn(A,output,input),length(output),length(input))
 
+ismultiplicative(A,input) = hasmethod(*,Tuple{typeof(A),typeof(input)})
 
 # Create a function for operator A that can act upon an input of type AbstractVector
 # and return an output of type AbstractVector. It should wrap the input vector
 # in the input data type associated with A and it should then unwrap its
 # output back into vector form
-function _create_fcn(A,input)
+#=function _create_fcn(A,output,input)
     # if A has an associated * operation, then use this
-    if hasmethod(*,Tuple{typeof(A),typeof(input)})
+    if _ismultiplicative(A,input)
         fcn = _create_vec_multiplication(A,input)
     # or if A is a function or function-like object, then use this
     elseif hasmethod(A,Tuple{typeof(input)})
@@ -73,13 +76,34 @@ function _create_fcn(A,input)
     end
     return fcn
 end
+=#
+_create_fcn(A,input) = _create_fcn(A,nothing,input)
+_create_fcn(A,output,input) = _create_fcn(A,output,input,Val(ismultiplicative(A,input)))
 
-_create_vec_multiplication(A,u::TU) where {TU} = (x -> _unwrap_vec(A*_wrap_vec(x,u)))
-_create_vec_function(A,u::TU) where {TU} = (x -> _unwrap_vec(A(_wrap_vec(x,u))))
-_create_vec_backslash(A,u::TU) where {TU} = (x -> _unwrap_vec(A\_wrap_vec(x,u)))
-_create_vec_backslash!(A,u::TU) where {TU} = (y,x) -> (_ywrap = _wrap_vec(y,u); ldiv!(_ywrap,A,_wrap_vec(x,u)); y)
-_create_vec_backslash!(A::UniformScaling,u::TU) where {TU} = (y,x) -> (_wrap_vec(y,u) .= A\_wrap_vec(x,u))
-_create_vec_backslash!(A::AbstractMatrix,u::TU) where {TU} = (Afact = factorize(A); (y,x) -> (_ywrap = _wrap_vec(y,u); _ywrap .= Afact\_wrap_vec(x,u)))
+_create_fcn(A,output,input,::Val{true}) = _create_vec_multiplication(A,input)
+_create_fcn(A,output,input,::Val{false}) = _create_fcn_function(A,output,input)
+_create_fcn_function(A,output,input) = _create_fcn_function(A,output,input,Val(isinplace(A,2)))
+
+# out of place
+function _create_fcn_function(A,output,input,::Val{false})
+    hasmethod(A,Tuple{typeof(input)}) || error("No function exists for this operator to act upon this type of data")
+    _create_vec_function(A,input)
+end
+
+function _create_fcn_function(A,output,input,::Val{true})
+    hasmethod(A,Tuple{typeof(output),typeof(input)}) || error("No function exists for this operator to act upon this type of data")
+    _create_vec_function!(A,output,input)
+end
+
+
+# In each of these, u, outp, inp only provide the templates/sizes for the wrapping.
+@inline _create_vec_multiplication(A,u::TU) where {TU} = (x -> _unwrap_vec(A*_wrap_vec(x,u)))
+@inline _create_vec_function(A,u::TU) where {TU} = (x -> _unwrap_vec(A(_wrap_vec(x,u))))
+@inline _create_vec_function!(A,outp::TO,inp::TI) where {TO,TI} = ((y,x) -> (_outpwrap = _wrap_vec(y,outp); A(_outpwrap,_wrap_vec(x,inp))))
+@inline _create_vec_backslash(A,u::TU) where {TU} = (x -> _unwrap_vec(A\_wrap_vec(x,u)))
+@inline _create_vec_backslash!(A,u::TU) where {TU} = (y,x) -> (_ywrap = _wrap_vec(y,u); ldiv!(_ywrap,A,_wrap_vec(x,u)); y)
+@inline _create_vec_backslash!(A::UniformScaling,u::TU) where {TU} = (y,x) -> (_wrap_vec(y,u) .= A\_wrap_vec(x,u))
+@inline _create_vec_backslash!(A::AbstractMatrix,u::TU) where {TU} = (Afact = factorize(A); (y,x) -> (_ywrap = _wrap_vec(y,u); _ywrap .= Afact\_wrap_vec(x,u)))
 
 
 
