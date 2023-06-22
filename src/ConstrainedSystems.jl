@@ -1,7 +1,7 @@
 module ConstrainedSystems
 
 using LinearMaps
-using KrylovKit
+#using KrylovKit
 using RecursiveArrayTools
 #using IterativeSolvers
 #using UnPack

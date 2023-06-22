@@ -15,13 +15,13 @@ function mul!(output::Union{Tuple{AbstractVector{T},AbstractVector{T}},AbstractV
     return output
 end
 
-function mul!(sol::Tuple{TU,TF},sys::SaddleSystem,rhs::Tuple{TU,TF}) where {T,Ns,Nc,TU,TF}
+function mul!(sol::Tuple{TU,TF},sys::SaddleSystem,rhs::Tuple{TU,TF}) where {TU,TF}
     u, f = sol
     r₁, r₂ = rhs
     return mul!((_unwrap_vec(u),_unwrap_vec(f)),sys,(_unwrap_vec(r₁),_unwrap_vec(r₂)))
 end
 
-function mul!(sol::ArrayPartition,sys::SaddleSystem,rhs::ArrayPartition) where {T,Ns,Nc,TU,TF}
+function mul!(sol::ArrayPartition,sys::SaddleSystem,rhs::ArrayPartition)
     u, f = sol.x
     r₁, r₂ = rhs.x
     return mul!((_unwrap_vec(u),_unwrap_vec(f)),sys,(_unwrap_vec(r₁),_unwrap_vec(r₂)))
@@ -99,19 +99,19 @@ function ldiv!(sol::Union{Tuple{AbstractVector{T},AbstractVector{T}},AbstractVec
     return sol
 end
 
-function ldiv!(sol::Tuple{TU,TF},sys::SaddleSystem,rhs::Tuple{TU,TF}) where {T,Ns,Nc,TU,TF}
+function ldiv!(sol::Tuple{TU,TF},sys::SaddleSystem,rhs::Tuple{TU,TF}) where {TU,TF}
     u, f = sol
     r₁, r₂ = rhs
     return ldiv!((_unwrap_vec(u),_unwrap_vec(f)),sys,(_unwrap_vec(r₁),_unwrap_vec(r₂)))
 end
 
-function ldiv!(sol::ArrayPartition,sys::SaddleSystem,rhs::ArrayPartition) where {T,Ns,Nc,TU,TF}
+function ldiv!(sol::ArrayPartition,sys::SaddleSystem,rhs::ArrayPartition)
     u, f = sol.x
     r₁, r₂ = rhs.x
     return ldiv!((_unwrap_vec(u),_unwrap_vec(f)),sys,(_unwrap_vec(r₁),_unwrap_vec(r₂)))
 end
 
-function (\)(sys::SaddleSystem,rhs::Tuple) where {T,Ns,Nc}
+function (\)(sys::SaddleSystem,rhs::Tuple)
     u, f = rhs
     sol = (similar(u),similar(f))
     ldiv!(sol,sys,rhs)
