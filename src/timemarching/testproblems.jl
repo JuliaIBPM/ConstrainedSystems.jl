@@ -246,14 +246,14 @@ function partitioned_problem(;tmax=1.0,iip=true)
   end
   X_rhs(y,p,t) = X_rhs!(deepcopy(X₀),y,p,t)
 
-  function U_rhs!(dy,y,p,t)
+  function U_rhs!(dy,u,p,t)
     fill!(dy,0.0)
     ω = p.params[1]
     dy[1] = -ω*cos(ω*t)
     dy[2] = -ω*sin(ω*t)
     return dy
   end
-  U_rhs(y,p,t) = U_rhs!(deepcopy(U₀),y,p,t)
+  U_rhs(u,p,t) = U_rhs!(deepcopy(U₀),u,p,t)
 
   ode_rhs! = ArrayPartition((X_rhs!,U_rhs!))
   ode_rhs = ArrayPartition((X_rhs,U_rhs))

@@ -87,16 +87,18 @@ of `B2` on `y`). The function `r1` must of the in-place form `r1(dy,y,p,t)`, and
 
 An optional keyword argument `param_update_func` can be used to set a function that updates problem parameters with
 the current solution. This function must take the in-place form `f(q,u,p,t)` or out of place form
-`f(u,p,t)` to create some `q` based on `u`. (Note that `q` might enter the function simply as `p`.) This function can
+`f(u,p,t)` to create some `q` based on `u`, where `y = state(u)` and `z = constraint(u)`. (Note that `q` might enter the function simply as `p`.) This function can
 be used to update `B1` and `B2` with state information, for example.
 
 We can also include another (unconstrained) set of equations to the set above:
 
 ``
-\\dfrac{dx}{dt} = r_{1x}(x,t)
+\\dfrac{dx}{dt} = r_{1x}(u,p,t)
 ``
 
-In this case, we would pass the pair of `r1` functions as an `ArrayPartition`.
+In this case, the right-hand side has access to the entire `u` vector, where `y = state(u)`
+and `z = constraint(u)`, and `x = aux_state(u)`. We would pass
+the pair of `r1` functions as an `ArrayPartition`.
 """
 struct ConstrainedODEFunction{iip,static,F1,F2,TMM,C,Ta,Tt,TJ,JVP,VJP,JP,SP,TW,TWt,TPJ,S,TCV,PF} <: AbstractODEFunction{iip}
     odef :: F1
@@ -219,11 +221,11 @@ _complete_r1(r1,::Val{true},_func_cache) = (du,u,p,t) -> (dy = state(du); r1(dy,
 _complete_r1(r1,::Val{false},_func_cache) = (u,p,t) -> (du = deepcopy(u); zero_vec!(du); state(du) .= r1(state(u),p,t); return du)
 _complete_r1(r1::ArrayPartition,::Val{true},_func_cache) =
             SplitFunction((du,u,p,t) ->(dy = state(du); dx = aux_state(du); zero_vec!(dx); state_r1(r1)(dy,state(u),p,t)),
-                          (du,u,p,t) ->(dy = state(du); dx = aux_state(du); zero_vec!(dy); aux_r1(r1)(dx,aux_state(u),p,t));
+                          (du,u,p,t) ->(dy = state(du); dx = aux_state(du); zero_vec!(dy); aux_r1(r1)(dx,u,p,t));
                           _func_cache=deepcopy(_func_cache))
 _complete_r1(r1::ArrayPartition,::Val{false},_func_cache) =
             SplitFunction((u,p,t) -> (du = deepcopy(u); zero_vec!(du); state(du) .= state_r1(r1)(state(u),p,t); return du),
-                          (u,p,t) -> (du = deepcopy(u); zero_vec!(du); aux_state(du) .= aux_r1(r1)(aux_state(u),p,t); return du))
+                          (u,p,t) -> (du = deepcopy(u); zero_vec!(du); aux_state(du) .= aux_r1(r1)(u,p,t); return du))
 
 
 _complete_r2(r2,::Val{true},_func_cache) = (du,u,p,t) -> (dz = constraint(du); r2(dz,p,t))
