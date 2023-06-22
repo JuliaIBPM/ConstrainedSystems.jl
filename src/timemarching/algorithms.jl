@@ -1,5 +1,6 @@
 ## Definitions of algorithms ##
 
+stats_field(integrator) = integrator.stats
 
 # WrayHERK is scheme C in Liska and Colonius (JCP 2016)
 # BraseyHairerHERK is scheme B in Liska and Colonius (JCP 2016)
@@ -181,7 +182,7 @@ function initialize!(integrator,cache::LiskaIFHERKCache)
     integrator.k[2] = integrator.fsallast
     integrator.f.odef(integrator.fsalfirst, integrator.uprev, integrator.p, integrator.t) # Pre-start fsal
     integrator.f.param_update_func(integrator.p,integrator.uprev,integrator.p,integrator.t)
-    integrator.stats.nf += 1
+    stats_field(integrator).nf += 1
 
 end
 
@@ -209,7 +210,7 @@ end
 
     ## Stage 1
     _ode_r1!(k1,f,u,pold_ptr,ttmp)
-    integrator.stats.nf += 1
+    stats_field(integrator).nf += 1
     @.. k1 *= dt*ã11
     @.. utmp = uprev + k1
     ttmp = t + dt*c̃1
@@ -242,7 +243,7 @@ end
 
     ## Stage 2
     _ode_r1!(k2,f,u,pold_ptr,ttmp)
-    integrator.stats.nf += 1
+    stats_field(integrator).nf += 1
     @.. k2 *= dt*ã22
     @.. utmp = uprev + k2 + dt*ã21*k1
     ttmp = t + dt*c̃2
@@ -274,7 +275,7 @@ end
 
     ## Stage 3
     _ode_r1!(k3,f,u,pold_ptr,ttmp)
-    integrator.stats.nf += 1
+    stats_field(integrator).nf += 1
     @.. k3 *= dt*ã33
     @.. utmp = uprev + k3 + dt*ã32*k2 + dt*ã31*k1
     ttmp = t + dt
@@ -299,7 +300,7 @@ end
     # Final steps
     param_update_func(p,u,ptmp,t+dt)
     f.odef(integrator.fsallast, u, p, t+dt)
-    integrator.stats.nf += 1
+    stats_field(integrator).nf += 1
 
     return nothing
 end
@@ -309,7 +310,7 @@ function initialize!(integrator,cache::LiskaIFHERKConstantCache)
   integrator.k = typeof(integrator.k)(undef, integrator.kshortsize)
   integrator.fsalfirst = integrator.f.odef(integrator.uprev, integrator.p, integrator.t) # Pre-start fsal
   integrator.p = integrator.f.param_update_func(integrator.uprev,integrator.p,integrator.t)
-  integrator.stats.nf += 1
+  stats_field(integrator).nf += 1
 
   # Avoid undefined entries if k is an array of arrays
   integrator.fsallast = zero(integrator.fsalfirst)
@@ -340,7 +341,7 @@ end
     ## Stage 1
     ttmp = t
     k1 = _ode_r1(f,uprev,pold_ptr,ttmp)
-    integrator.stats.nf += 1
+    stats_field(integrator).nf += 1
     @.. k1 *= dt*ã11
     utmp = @.. uprev + k1
     ttmp = t + dt*c̃1
@@ -374,7 +375,7 @@ end
 
     ## Stage 2
     k2 = _ode_r1(f,u,pold_ptr,ttmp)
-    integrator.stats.nf += 1
+    stats_field(integrator).nf += 1
     @.. k2 *= dt*ã22
     @.. utmp = uprev + k2 + dt*ã21*k1
     ttmp = t + dt*c̃2
@@ -405,7 +406,7 @@ end
 
     ## Stage 3
     k3 = _ode_r1(f,u,pold_ptr,ttmp)
-    integrator.stats.nf += 1
+    stats_field(integrator).nf += 1
     @.. k3 *= dt*ã33
     @.. utmp = uprev + k3 + dt*ã32*k2 + dt*ã31*k1
     ttmp = t + dt
@@ -430,7 +431,7 @@ end
     # Final steps
     integrator.p = param_update_func(u,ptmp,t)
     k = f.odef(u, integrator.p, t+dt)
-    integrator.stats.nf += 1
+    stats_field(integrator).nf += 1
 
     integrator.fsallast = k
     integrator.k[1] = integrator.fsalfirst
@@ -453,7 +454,7 @@ function initialize!(integrator,cache::IFHEEulerCache)
     integrator.k[2] = integrator.fsallast
     integrator.f.odef(integrator.fsalfirst, integrator.uprev, integrator.p, integrator.t) # Pre-start fsal
     integrator.f.param_update_func(integrator.p,integrator.uprev,integrator.p,integrator.t)
-    integrator.stats.nf += 1
+    stats_field(integrator).nf += 1
 
 end
 
@@ -478,7 +479,7 @@ end
     u .= uprev
 
     _ode_r1!(k1,f,u,pold_ptr,ttmp)
-    integrator.stats.nf += 1
+    stats_field(integrator).nf += 1
     @.. k1 *= dt
     @.. utmp = uprev + k1
     ttmp = t + dt
@@ -502,7 +503,7 @@ end
     # Final steps
     param_update_func(p,u,pold_ptr,t)
     f.odef(integrator.fsallast, u, p, t+dt)
-    integrator.stats.nf += 1
+    stats_field(integrator).nf += 1
 
     return nothing
 end
@@ -513,7 +514,7 @@ function initialize!(integrator,cache::IFHEEulerConstantCache)
   integrator.k = typeof(integrator.k)(undef, integrator.kshortsize)
   integrator.fsalfirst = integrator.f.odef(integrator.uprev, integrator.p, integrator.t) # Pre-start fsal
   integrator.p = integrator.f.param_update_func(integrator.uprev,integrator.p,integrator.t)
-  integrator.stats.nf += 1
+  stats_field(integrator).nf += 1
 
   # Avoid undefined entries if k is an array of arrays
   integrator.fsallast = zero(integrator.fsalfirst)
@@ -542,7 +543,7 @@ end
   pnew_ptr = ptmp
 
   k1 = _ode_r1(f,uprev,pold_ptr,t)
-  integrator.stats.nf += 1
+  stats_field(integrator).nf += 1
   @.. k1 *= dt
   utmp = @.. uprev + k1
 
@@ -566,7 +567,7 @@ end
   # Final steps
   integrator.p = param_update_func(u,pold_ptr,t)
   k = f.odef(u, integrator.p, t+dt)
-  integrator.stats.nf += 1
+  stats_field(integrator).nf += 1
 
   integrator.fsallast = k
   integrator.k[1] = integrator.fsalfirst
