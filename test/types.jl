@@ -108,7 +108,7 @@ end
     fill!(dy,1.0)
   end
 
-  function aux_r1!(dy,y,p,t)
+  function aux_r1!(dy,u,p,t)
     fill!(dy,2.0)
   end
 
@@ -121,7 +121,7 @@ end
   @test constraint(du) == fill(0.0,length(z))
   @test aux_state(du) == fill(2.0,length(x))
 
-  function r2!(dz,p,t)
+  function r2!(dz,x,p,t)
     fill!(dz,3.0)
   end
 
@@ -135,10 +135,10 @@ end
   B1 = ones(Float64,length(y),length(z))
   B2 = ones(Float64,length(z),length(y))
 
-  function B1!(dy,z,p)
+  function B1!(dy,z,x,p)
     dy .= p[1]*z
   end
-  function B2!(dz,y,p)
+  function B2!(dz,y,x,p)
     dz .= p[2]*y
   end
 
@@ -178,9 +178,9 @@ end
   p = [B1,B2]
 
   ode_rhs!(dy,y,p,t) = dy .= 1.01*y
-  constraint_force!(dy,z,p) = dy .= p[1]*z
-  constraint_rhs!(dz,p,t) = dz .= 1.0
-  constraint_op!(dz,y,p) = dz .= p[2]*y
+  constraint_force!(dy,z,x,p) = dy .= p[1]*z
+  constraint_rhs!(dz,x,p,t) = dz .= 1.0
+  constraint_op!(dz,y,x,p) = dz .= p[2]*y
 
   u₀ = solvector(state=y,constraint=z)
   du = zero(u₀)
@@ -192,9 +192,9 @@ end
   @test constraint(du) == 1.0 .- B2*y
 
   ode_rhs(y,p,t) = 1.01*y
-  constraint_force(z,p) = p[1]*z
-  constraint_rhs(p,t) = fill(1.0,nc)
-  constraint_op(y,p) = p[2]*y
+  constraint_force(z,x,p) = p[1]*z
+  constraint_rhs(x,p,t) = fill(1.0,nc)
+  constraint_op(y,x,p) = p[2]*y
 
   f = ConstrainedODEFunction(ode_rhs,constraint_rhs,
                             constraint_force,constraint_op)

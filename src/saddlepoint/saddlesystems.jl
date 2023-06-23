@@ -58,7 +58,7 @@ An optional keyword argument `solver=` can be used to specify the type of
 solution for the Schur complement system. By default, this is set to `Direct`,
 and the Schur complement matrix is formed, factorized, and stored. This can be
 changed to `Iterative`, in which case an iterative solver is determined
-by the `lin_solve` function of [`KrylovKit.jl`](https://github.com/Jutho/KrylovKit.jl).
+by the `linsolve` function of [`KrylovKit.jl`](https://github.com/Jutho/KrylovKit.jl).
 """
 function SaddleSystem(A::LinearMap{T},B₂::LinearMap{T},B₁ᵀ::LinearMap{T},C::LinearMap{T},
                       A⁻¹::LinearMap{T},P::LinearMap{T},TU,TF;solver::Type{TS}=Direct,kwargs...) where {T,TS<:SchurSolverType}
@@ -84,7 +84,8 @@ end
 abstract type Iterative <: SchurSolverType end
 
 function _schur_inverse_function(S,T,M,::Type{Iterative},kwargs...)
-  return LinearMap{T}(x -> ((y,_) = linsolve(S,x); y) ,M)
+
+  return LinearMap{T}(x -> (prob = LinearProblem(S,x); sol = solve(prob); sol.u) ,M)
 end
 
 macro createsolver(stype)

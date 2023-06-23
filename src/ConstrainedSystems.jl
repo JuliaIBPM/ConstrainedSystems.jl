@@ -1,7 +1,7 @@
 module ConstrainedSystems
 
 using LinearMaps
-using KrylovKit
+#using KrylovKit
 using RecursiveArrayTools
 #using IterativeSolvers
 #using UnPack
@@ -17,6 +17,8 @@ import OrdinaryDiffEq: OrdinaryDiffEqAlgorithm, alg_order, alg_cache,
 import OrdinaryDiffEq.DiffEqBase: AbstractDiffEqLinearOperator,
                                   DEFAULT_UPDATE_FUNC, has_exp,
                                   AbstractODEFunction, isinplace, numargs
+
+import LinearMaps: LinearMap, FunctionMap
 
 import RecursiveArrayTools: recursivecopy, recursivecopy!, recursive_mean
 
