@@ -86,20 +86,20 @@ function basic_constrained_problem(;tmax=1.0,iip=true)
   end
   ode_rhs(y::Vector{Float64},p,t) = ode_rhs!(deepcopy(y₀),y,p,t)
 
-  constraint_rhs!(dz::Vector{Float64},p,t) = dz .= Float64[p.params[1]]
-  constraint_rhs(p,t) = constraint_rhs!(deepcopy(z₀),p,t)
+  constraint_rhs!(dz::Vector{Float64},x,p,t) = dz .= Float64[p.params[1]]
+  constraint_rhs(x,p,t) = constraint_rhs!(deepcopy(z₀),x,p,t)
 
-  function op_constraint_force!(dy::Vector{Float64},z::Vector{Float64},p)
+  function op_constraint_force!(dy::Vector{Float64},z::Vector{Float64},x,p)
     @unpack B₁ᵀ = p
     dy .= B₁ᵀ*z
   end
-  op_constraint_force(z::Vector{Float64},p) = op_constraint_force!(deepcopy(y₀),z,p)
+  op_constraint_force(z::Vector{Float64},x,p) = op_constraint_force!(deepcopy(y₀),z,x,p)
 
-  function constraint_op!(dz::Vector{Float64},y::Vector{Float64},p)
+  function constraint_op!(dz::Vector{Float64},y::Vector{Float64},x,p)
     @unpack B₂ = p
     dz .= B₂*y
   end
-  constraint_op(y::Vector{Float64},p) = constraint_op!(deepcopy(z₀),y,p)
+  constraint_op(y::Vector{Float64},x,p) = constraint_op!(deepcopy(z₀),y,x,p)
 
   function update_p!(q,u,p,t)
     y, z = state(u), constraint(u)
@@ -158,21 +158,21 @@ function cartesian_pendulum_problem(;tmax=1.0,iip=true)
   pendulum_rhs(y::Vector{Float64},p,t) = pendulum_rhs!(zero(y),y,p,t)
 
 
-  length_constraint_rhs!(dz::Vector{Float64},p,t) = dz .= [0.0,p.params[1]^2]
-  length_constraint_rhs(p,t) = length_constraint_rhs!(zero(z₀),p,t)
+  length_constraint_rhs!(dz::Vector{Float64},x,p,t) = dz .= [0.0,p.params[1]^2]
+  length_constraint_rhs(x,p,t) = length_constraint_rhs!(zero(z₀),x,p,t)
 
 
-  function length_constraint_force!(dy::Vector{Float64},z::Vector{Float64},p)
+  function length_constraint_force!(dy::Vector{Float64},z::Vector{Float64},x,p)
     @unpack B₁ᵀ = p
     dy .= B₁ᵀ*z
   end
-  length_constraint_force(z::Vector{Float64},p) = length_constraint_force!(zero(y₀),z,p)
+  length_constraint_force(z::Vector{Float64},x,p) = length_constraint_force!(zero(y₀),z,x,p)
 
-  function length_constraint_op!(dz::Vector{Float64},y::Vector{Float64},p)
+  function length_constraint_op!(dz::Vector{Float64},y::Vector{Float64},x,p)
     @unpack B₂ = p
     dz .= B₂*y
   end
-  length_constraint_op(y::Vector{Float64},p) = length_constraint_op!(zero(z₀),y,p)
+  length_constraint_op(y::Vector{Float64},x,p) = length_constraint_op!(zero(z₀),y,x,p)
 
   function update_p!(q,u,p,t)
     y, z = state(u), constraint(u)
@@ -258,21 +258,21 @@ function partitioned_problem(;tmax=1.0,iip=true)
   ode_rhs! = ArrayPartition((X_rhs!,U_rhs!))
   ode_rhs = ArrayPartition((X_rhs,U_rhs))
 
-  constraint_rhs!(dz,p,t) = dz .= Float64[0]
-  constraint_rhs(p,t) = constraint_rhs!(deepcopy(Z₀),p,t)
+  constraint_rhs!(dz,x,p,t) = dz .= Float64[0]
+  constraint_rhs(x,p,t) = constraint_rhs!(deepcopy(Z₀),x,p,t)
 
-  function op_constraint_force!(dy,z,p)
+  function op_constraint_force!(dy,z,x,p)
     @unpack B₁ᵀ = p
     dy .= B₁ᵀ*z
     return dy
   end
-  op_constraint_force(z,p) = op_constraint_force!(deepcopy(X₀),z,p)
+  op_constraint_force(z,x,p) = op_constraint_force!(deepcopy(X₀),z,x,p)
 
-  function constraint_op!(dz,y,p)
+  function constraint_op!(dz,y,x,p)
     @unpack B₂ = p
     dz .= B₂*y
   end
-  constraint_op(y,p) = constraint_op!(deepcopy(Z₀),y,p)
+  constraint_op(y,x,p) = constraint_op!(deepcopy(Z₀),y,x,p)
 
   function update_p!(q,u,p,t)
     x = aux_state(u)

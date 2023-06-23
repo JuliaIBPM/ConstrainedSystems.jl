@@ -18,6 +18,8 @@ import OrdinaryDiffEq.DiffEqBase: AbstractDiffEqLinearOperator,
                                   DEFAULT_UPDATE_FUNC, has_exp,
                                   AbstractODEFunction, isinplace, numargs
 
+import LinearMaps: LinearMap, FunctionMap
+
 import RecursiveArrayTools: recursivecopy, recursivecopy!, recursive_mean
 
 

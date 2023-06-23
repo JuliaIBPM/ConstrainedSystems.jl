@@ -76,28 +76,32 @@ This specifies the functions and operators that comprise an ODE problem with the
 ``
 
 ``
-B_2 y = r_2(t)
+B_2 y = r_2(x,t)
 ``
 
+where ``y`` is the state, ``z`` is a constraint force, and ``x`` is an auxiliary
+state describing the constraints.
+
 The optional linear operator `L` defaults to zeros. The `B1` and `B2` functions must be of the respective
-in-place forms `B1(dy,z,p)` (to compute the action of `B1` on `z`) and `B2(dz,y,p)` (to compute that action
+in-place forms `B1(dy,z,x,p)` (to compute the action of `B1` on `z`) and `B2(dz,y,x,p)` (to compute the action
 of `B2` on `y`). The function `r1` must of the in-place form `r1(dy,y,p,t)`, and `r2` must be in the in-place form
-`r2(dz,p,t)`. Alternatively, one can supply out-of-place forms, respectively, as `B1(z,p)`, `B2(y,p)`,
-`r1(y,p,t)` and `r2(p,t)`.
+`r2(dz,x,p,t)`. Alternatively, one can supply out-of-place forms, respectively, as `B1(z,x,p)`, `B2(y,x,p)`,
+`r1(y,p,t)` and `r2(x,p,t)`.
 
 An optional keyword argument `param_update_func` can be used to set a function that updates problem parameters with
 the current solution. This function must take the in-place form `f(q,u,p,t)` or out of place form
-`f(u,p,t)` to create some `q` based on `u`, where `y = state(u)` and `z = constraint(u)`. (Note that `q` might enter the function simply as `p`.) This function can
-be used to update `B1` and `B2` with state information, for example.
+`f(u,p,t)` to create some `q` based on `u`, where `y = state(u)`, `z = constraint(u)` and `x = aux_state(u)`.
+(Note that `q` might enter the function simply as `p`, to be mutated.) This function can
+be used to update `B1` and `B2`, for example.
 
-We can also include another (unconstrained) set of equations to the set above:
+We can also include another (unconstrained) set of equations to the set above
+in order to update `x`:
 
 ``
 \\dfrac{dx}{dt} = r_{1x}(u,p,t)
 ``
 
-In this case, the right-hand side has access to the entire `u` vector, where `y = state(u)`
-and `z = constraint(u)`, and `x = aux_state(u)`. We would pass
+In this case, the right-hand side has access to the entire `u` vector. We would pass
 the pair of `r1` functions as an `ArrayPartition`.
 """
 struct ConstrainedODEFunction{iip,static,F1,F2,TMM,C,Ta,Tt,TJ,JVP,VJP,JP,SP,TW,TWt,TPJ,S,TCV,PF} <: AbstractODEFunction{iip}
@@ -205,7 +209,7 @@ alloutofplace(r1,::Nothing,::Nothing,::Nothing) = _isoop_r1(r1)
 
 
 
-for (f,nv) in ((:r1,4),(:r2,3),(:B1,3),(:B2,3))
+for (f,nv) in ((:r1,4),(:r2,4),(:B1,4),(:B2,4))
   iipfcn = Symbol("_isinplace_",string(f))
   oopfcn = Symbol("_isoop_",string(f))
   completefcn = Symbol("_complete_",string(f))
@@ -228,18 +232,22 @@ _complete_r1(r1::ArrayPartition,::Val{false},_func_cache) =
                           (u,p,t) -> (du = deepcopy(u); zero_vec!(du); aux_state(du) .= aux_r1(r1)(u,p,t); return du))
 
 
-_complete_r2(r2,::Val{true},_func_cache) = (du,u,p,t) -> (dz = constraint(du); r2(dz,p,t))
+_complete_r2(r2,::Val{true},_func_cache) = (du,u,p,t) -> (dz = constraint(du); x = aux_state(u); r2(dz,x,p,t))
 _complete_r2(::Nothing,::Val{true},_func_cache) = (du,u,p,t) -> zero_vec!(constraint(du))
-_complete_r2(r2,::Val{false},_func_cache) = (u,p,t) -> (du = deepcopy(u); zero_vec!(du); constraint(du) .= r2(p,t); return du)
+_complete_r2(r2,::Val{false},_func_cache) = (u,p,t) -> (du = deepcopy(u); zero_vec!(du); x = aux_state(u); constraint(du) .= r2(x,p,t); return du)
 
 
-_complete_B1(B1,::Val{true},_func_cache) = (du,u,p,t) -> (dy = state(du); dx = aux_state(du); zero_vec!(dx); B1(dy,constraint(u),p); dy .*= -1.0)
+_complete_B1(B1,::Val{true},_func_cache) = (du,u,p,t) -> (dy = state(du); dx = aux_state(du); zero_vec!(dx);
+                                              z = constraint(u); x = aux_state(u); B1(dy,z,x,p); dy .*= -1.0)
 _complete_B1(::Nothing,::Val{true},_func_cache) = (du,u,p,t) -> (zero_vec!(aux_state(du)); zero_vec!(state(du)))
-_complete_B1(B1,::Val{false},_func_cache) = (u,p,t) -> (du = deepcopy(u); zero_vec!(du); state(du) .= -B1(constraint(u),p); return du)
+_complete_B1(B1,::Val{false},_func_cache) = (u,p,t) -> (du = deepcopy(u); zero_vec!(du);
+                                              z = constraint(u); x = aux_state(u); state(du) .= -B1(z,x,p); return du)
 
-_complete_B2(B2,::Val{true},_func_cache) = (du,u,p,t) -> (dz = constraint(du); B2(dz,state(u),p); dz .*= -1.0)
+_complete_B2(B2,::Val{true},_func_cache) = (du,u,p,t) -> (dz = constraint(du); y = state(u); x = aux_state(u);
+                                              B2(dz,y,x,p); dz .*= -1.0)
 _complete_B2(::Nothing,::Val{true},_func_cache) = (du,u,p,t) -> zero_vec!(constraint(du))
-_complete_B2(B2,::Val{false},_func_cache) = (u,p,t) -> (du = deepcopy(u); zero_vec!(du); constraint(du) .= -B2(state(u),p); return du)
+_complete_B2(B2,::Val{false},_func_cache) = (u,p,t) -> (du = deepcopy(u); zero_vec!(du); y = state(u); x = aux_state(u);
+                                             constraint(du) .= -B2(y,x,p); return du)
 
 function (f::ConstrainedODEFunction)(du,u,p,t)
     zero_vec!(f.cache)
