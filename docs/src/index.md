@@ -28,17 +28,17 @@ Some of the key components of this package are
 extend the tools in the [DifferentialEquations.jl](https://github.com/SciML/DifferentialEquations.jl) package, and utilize the same basic syntax for setting
 up a problem and solving it.
 
-* Allowance for variable constraint operators B<sub>1</sub><sup>T</sup> and B<sub>2</sub>,
+* Allowance for variable constraint operators $B_1^T$ and $B_2$,
 through the use of a variable parameter argument and an associated parameter update
 function.
 
-* The ability to add an auxiliary (unconstrained) system of equations that the
-constraint operators $B_1^T$ and $B_2$ depend upon.
+* The ability to add an auxiliary (unconstrained) system of equations and state that the
+constraint operators $B_1^T$ and $B_2$ and the right-hand side $r_2$ depend upon.
 
 
 ## Installation
 
-This package works on Julia `1.4` and above and is registered in the general Julia registry. To install from the REPL, type
+This package works on Julia `1.6` and above and is registered in the general Julia registry. To install from the REPL, type
 e.g.,
 ```julia
 ] add ConstrainedSystems
