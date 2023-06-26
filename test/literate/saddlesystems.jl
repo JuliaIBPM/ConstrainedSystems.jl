@@ -1,13 +1,10 @@
-```@meta
-EditURL = "<unknown>/literate/saddlesystems.jl"
-```
+# # Saddle point systems
 
-# Saddle point systems
+#md # ```@meta
+#md # CurrentModule = ConstrainedSystems
+#md # ```
 
-```@meta
-CurrentModule = ConstrainedSystems
-```
-
+#=
 ```math
 \def\ddt#1{\frac{\mathrm{d}#1}{\mathrm{d}t}}
 \renewcommand{\vec}{\boldsymbol}
@@ -16,7 +13,9 @@ CurrentModule = ConstrainedSystems
 \newcommand{\unormal}{\uvec{n}}
 \renewcommand{\d}{\,\mathrm{d}}
 ```
+=#
 
+#=
 Saddle systems comprise an important part of solving mechanics problems with
 constraints. In such problems, there is an underlying system to solve, and the
 addition of constraints requires that the system is subjected to additional
@@ -38,13 +37,13 @@ whole system is symmetric.
 [ConstrainedSystems.jl](https://github.com/JuliaIBPM/ConstrainedSystems.jl) allows us to solve such systems for $u$ and $f$ in a fairly easy way.
 We need only to provide rules for how to evaluate the actions of the various
 operators in the system. Let us use an example to show how this can be done.
+=#
 
-````@example saddlesystems
 using ConstrainedSystems
 using CartesianGrids
 using Plots
-````
 
+#=
 ## Translating cylinder in potential flow
 
 In irrotational, incompressible flow, the streamfunction $\psi$ satisfies Laplace's equation,
@@ -78,83 +77,76 @@ to know when we check the value of $f$ obtained in our solution.
 
 First, let us set up the body, centered at $(1,1)$ and of radius $1/2$. We will
 also initialize a data structure for the force:
+=#
 
-````@example saddlesystems
 n = 128; θ = range(0,stop=2π,length=n+1);
 xb = 1.0 .+ 0.5*cos.(θ[1:n]); yb = 1.0 .+ 0.5*sin.(θ[1:n]);
 X = VectorData(xb,yb);
 ψb = ScalarData(X);
 f = similar(ψb);
-nothing #hide
-````
 
+#=
 Now let's set up a grid of size $102\times 102$ (including the usual layer
 of ghost cells) and physical dimensions $2\times 2$.
+=#
 
-````@example saddlesystems
 nx = 102; ny = 102; Lx = 2.0; dx = Lx/(nx-2);
 w = Nodes(Dual,(nx,ny));
 ψ = similar(w);
-nothing #hide
-````
 
+#=
 We need to set up the operators now. First, the Laplacian:
-
-````@example saddlesystems
+=#
 L = plan_laplacian(size(w),with_inverse=true)
-````
 
+#=
 Note that we have made sure that this operator has an inverse. It is important
 that this operator, which represents the `A` matrix in our saddle system, comes
 with an associated backslash `\\` operation to carry out the inverse.
 
 Now we need to set up the regularization `R` and interpolation `E` operators.
+=#
 
-````@example saddlesystems
 regop = Regularize(X,dx;issymmetric=true)
 Rmat, Emat = RegularizationMatrix(regop,ψb,w);
-nothing #hide
-````
 
+#=
 Now we are ready to set up the system. The solution and right-hand side vectors
 are set up using `SaddleVector`.
+=#
 
-````@example saddlesystems
 rhs = SaddleVector(w,ψb)
 sol = SaddleVector(ψ,f)
-````
 
+#=
 and the saddle system is then set up with the three operators; the $C$ operator
 is presumed to be zero when it is not provided.
+=#
 
-````@example saddlesystems
 A = SaddleSystem(L,Emat,Rmat,rhs)
-````
 
+#=
 Note that all of the operators we have provided are either matrices (like `Emat` and `Rmat`)
 or functions or function-like operators (like `L`). The `SaddleSystem` constructor
 allows either. However, the order is important: we must supply $A$, $B_2$, $B_1^T$, and possibly $C$, in that order.
 
 Let's solve the system. We need to set the right-hand side. We will set `ψb`,
 but this will also change `rhs`, since that vector is pointing to the same object.
-
-````@example saddlesystems
+=#
 ψb .= -(xb.-1);
-nothing #hide
-````
 
+#=
 The right-hand side of the Laplace equation is zero. The right-hand side of the
 constraint is the specified streamfunction on the body. Note that we have
 subtracted the circle center from the $x$ positions on the body. The reason for
 this will be discussed in a moment.
 
 We solve the system with the convenient shorthand of the backslash:
-
-````@example saddlesystems
+=#
 sol .= A\rhs # hide
 @time sol .= A\rhs
-````
 
+#=
 Just to point out how fast it can be, we have also timed it. It's pretty fast.
 
 We can obtain the state vector and the constraint vector from `sol` using some
@@ -162,17 +154,12 @@ convenience functions `state(sol)` and `constraint(sol)`.
 
 Now, let's plot the solution in physical space. We'll plot the body shape for
 reference, also.
-
-````@example saddlesystems
+=#
 xg, yg = coordinates(w,dx=dx)
 plot(xg,yg,state(sol),xlim=(-Inf,Inf),ylim=(-Inf,Inf))
 plot!(xb,yb,fillcolor=:black,fillrange=0,fillalpha=0.25,linecolor=:black)
-````
 
+#=
 The solution shows the streamlines for a circle in vertical motion, as expected.
 All of the streamlines inside the circle are vertical.
-
----
-
-*This page was generated using [Literate.jl](https://github.com/fredrikekre/Literate.jl).*
-
+=#
