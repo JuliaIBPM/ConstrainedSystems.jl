@@ -104,7 +104,7 @@ end
   du = similar(u)
   fill!(du,0.0)
 
-  function state_r1!(dy,y,p,t)
+  function state_r1!(dy,y,x,p,t)
     fill!(dy,1.0)
   end
 
@@ -177,7 +177,7 @@ end
   B2 .= transpose(B1)
   p = [B1,B2]
 
-  ode_rhs!(dy,y,p,t) = dy .= 1.01*y
+  ode_rhs!(dy,y,x,p,t) = dy .= 1.01*y
   constraint_force!(dy,z,x,p) = dy .= p[1]*z
   constraint_rhs!(dz,x,p,t) = dz .= 1.0
   constraint_op!(dz,y,x,p) = dz .= p[2]*y
@@ -191,7 +191,7 @@ end
   @test state(du) == 1.01*y .- B1*z
   @test constraint(du) == 1.0 .- B2*y
 
-  ode_rhs(y,p,t) = 1.01*y
+  ode_rhs(y,x,p,t) = 1.01*y
   constraint_force(z,x,p) = p[1]*z
   constraint_rhs(x,p,t) = fill(1.0,nc)
   constraint_op(y,x,p) = p[2]*y

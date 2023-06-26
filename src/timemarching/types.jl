@@ -84,9 +84,9 @@ state describing the constraints.
 
 The optional linear operator `L` defaults to zeros. The `B1` and `B2` functions must be of the respective
 in-place forms `B1(dy,z,x,p)` (to compute the action of `B1` on `z`) and `B2(dz,y,x,p)` (to compute the action
-of `B2` on `y`). The function `r1` must of the in-place form `r1(dy,y,p,t)`, and `r2` must be in the in-place form
+of `B2` on `y`). The function `r1` must of the in-place form `r1(dy,y,x,p,t)`, and `r2` must be in the in-place form
 `r2(dz,x,p,t)`. Alternatively, one can supply out-of-place forms, respectively, as `B1(z,x,p)`, `B2(y,x,p)`,
-`r1(y,p,t)` and `r2(x,p,t)`.
+`r1(y,x,p,t)` and `r2(x,p,t)`.
 
 An optional keyword argument `param_update_func` can be used to set a function that updates problem parameters with
 the current solution. This function must take the in-place form `f(q,u,p,t)` or out of place form
@@ -209,26 +209,26 @@ alloutofplace(r1,::Nothing,::Nothing,::Nothing) = _isoop_r1(r1)
 
 
 
-for (f,nv) in ((:r1,4),(:r2,4),(:B1,4),(:B2,4))
+for (f,nv,nvaux) in ((:r1,5,4),(:r2,4,0),(:B1,4,0),(:B2,4,0))
   iipfcn = Symbol("_isinplace_",string(f))
   oopfcn = Symbol("_isoop_",string(f))
   completefcn = Symbol("_complete_",string(f))
   @eval $iipfcn(fcn) = isinplace(fcn,$nv)
-  @eval $iipfcn(fcn::ArrayPartition) = all(($iipfcn(x) for x in fcn.x))
+  @eval $iipfcn(fcn::ArrayPartition) = $iipfcn(fcn.x[1]) && isinplace(fcn.x[2],$nvaux)
   @eval $oopfcn(fcn) = first(numargs(fcn)) == $(nv-1)
-  @eval $oopfcn(fcn::ArrayPartition) = all(($oopfcn(x) for x in fcn.x))
+  @eval $oopfcn(fcn::ArrayPartition) = $oopfcn(fcn.x[1]) && first(numargs(fcn.x[2])) == $(nvaux-1)
   @eval $completefcn(fcn,::Val{iip};_func_cache=nothing) where {iip} = $completefcn(fcn,Val(iip),_func_cache)
   @eval $completefcn(::Nothing,::Val{false},_func_cache) = (u,p,t) -> zero(u)
 end
 
-_complete_r1(r1,::Val{true},_func_cache) = (du,u,p,t) -> (dy = state(du); r1(dy,state(u),p,t))
-_complete_r1(r1,::Val{false},_func_cache) = (u,p,t) -> (du = deepcopy(u); zero_vec!(du); state(du) .= r1(state(u),p,t); return du)
+_complete_r1(r1,::Val{true},_func_cache) = (du,u,p,t) -> (dy = state(du); y = state(u); x = aux_state(u); r1(dy,y,x,p,t))
+_complete_r1(r1,::Val{false},_func_cache) = (u,p,t) -> (du = deepcopy(u); zero_vec!(du); y = state(u); x = aux_state(u); state(du) .= r1(y,x,p,t); return du)
 _complete_r1(r1::ArrayPartition,::Val{true},_func_cache) =
-            SplitFunction((du,u,p,t) ->(dy = state(du); dx = aux_state(du); zero_vec!(dx); state_r1(r1)(dy,state(u),p,t)),
+            SplitFunction((du,u,p,t) ->(dy = state(du); dx = aux_state(du); zero_vec!(dx); y = state(u); x = aux_state(u); state_r1(r1)(dy,y,x,p,t)),
                           (du,u,p,t) ->(dy = state(du); dx = aux_state(du); zero_vec!(dy); aux_r1(r1)(dx,u,p,t));
                           _func_cache=deepcopy(_func_cache))
 _complete_r1(r1::ArrayPartition,::Val{false},_func_cache) =
-            SplitFunction((u,p,t) -> (du = deepcopy(u); zero_vec!(du); state(du) .= state_r1(r1)(state(u),p,t); return du),
+            SplitFunction((u,p,t) -> (du = deepcopy(u); zero_vec!(du); y = state(u); x = aux_state(u); state(du) .= state_r1(r1)(y,x,p,t); return du),
                           (u,p,t) -> (du = deepcopy(u); zero_vec!(du); aux_state(du) .= aux_r1(r1)(u,p,t); return du))
 
 

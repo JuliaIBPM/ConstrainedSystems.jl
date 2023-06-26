@@ -11,8 +11,8 @@ function basic_unconstrained_problem(;tmax=1.0,iip=true)
   α = 1.02
   p = α
 
-  ode_rhs!(dy,y,p,t) = dy .= p*y
-  ode_rhs(y,p,t) = p*y
+  ode_rhs!(dy,y,x,p,t) = dy .= p*y
+  ode_rhs(y,x,p,t) = p*y
 
   y₀ = ones(Float64,ns)
   u₀ = solvector(state=y₀)
@@ -38,8 +38,8 @@ function basic_unconstrained_if_problem(;tmax=1.0,iip=true)
   α = 1.02
   p = α
 
-  ode_rhs!(dy,y,p,t) = fill!(dy,0.0)
-  ode_rhs(y,p,t) = zero(y)
+  ode_rhs!(dy,y,x,p,t) = fill!(dy,0.0)
+  ode_rhs(y,x,p,t) = zero(y)
 
   L = α*I
 
@@ -77,14 +77,14 @@ function basic_constrained_problem(;tmax=1.0,iip=true)
   u₀ = solvector(state=y₀,constraint=z₀)
   du = deepcopy(u₀)
 
-  function ode_rhs!(dy::Vector{Float64},y::Vector{Float64},p,t)
+  function ode_rhs!(dy::Vector{Float64},y::Vector{Float64},x,p,t)
     dy .= 0.0
     dy[1] = y[3]
     dy[2] = y[4]
     dy[4] = -(y[1]-p.params[1]*t)*p.params[2]
     return dy
   end
-  ode_rhs(y::Vector{Float64},p,t) = ode_rhs!(deepcopy(y₀),y,p,t)
+  ode_rhs(y::Vector{Float64},x,p,t) = ode_rhs!(deepcopy(y₀),y,x,p,t)
 
   constraint_rhs!(dz::Vector{Float64},x,p,t) = dz .= Float64[p.params[1]]
   constraint_rhs(x,p,t) = constraint_rhs!(deepcopy(z₀),x,p,t)
@@ -147,7 +147,7 @@ function cartesian_pendulum_problem(;tmax=1.0,iip=true)
   p₀ = ProblemParams(params,Array{Float64}(undef,4,2),Array{Float64}(undef,2,4))
 
 
-  function pendulum_rhs!(dy::Vector{Float64},y::Vector{Float64},p,t)
+  function pendulum_rhs!(dy::Vector{Float64},y::Vector{Float64},x,p,t)
     dy .= 0.0
     dy[1] = y[3]
     dy[2] = y[4]
@@ -155,7 +155,7 @@ function cartesian_pendulum_problem(;tmax=1.0,iip=true)
     return dy
   end
 
-  pendulum_rhs(y::Vector{Float64},p,t) = pendulum_rhs!(zero(y),y,p,t)
+  pendulum_rhs(y::Vector{Float64},x,p,t) = pendulum_rhs!(zero(y),y,x,p,t)
 
 
   length_constraint_rhs!(dz::Vector{Float64},x,p,t) = dz .= [0.0,p.params[1]^2]
@@ -240,11 +240,11 @@ function partitioned_problem(;tmax=1.0,iip=true)
 
   L = Diagonal([βu,βv])
 
-  function X_rhs!(dy,y,p,t)
+  function X_rhs!(dy,y,x,p,t)
     fill!(dy,0.0)
     return dy
   end
-  X_rhs(y,p,t) = X_rhs!(deepcopy(X₀),y,p,t)
+  X_rhs(y,x,p,t) = X_rhs!(deepcopy(X₀),y,x,p,t)
 
   function U_rhs!(dy,u,p,t)
     fill!(dy,0.0)
