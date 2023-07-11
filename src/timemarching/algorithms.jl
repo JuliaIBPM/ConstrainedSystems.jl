@@ -233,8 +233,8 @@ end
     end
     zero_vec!(xtmp)
     B1_times_z!(utmp,S[1])
-    pold_ptr = ptmp
-    pnew_ptr = p
+    pold_ptr = p
+    pnew_ptr = ptmp
 
     ldiv!(yprev,Hhalfdt,yprev)
     ldiv!(state(k1),Hhalfdt,state(k1))
