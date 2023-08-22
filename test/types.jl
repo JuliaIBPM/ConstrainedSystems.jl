@@ -162,7 +162,7 @@ end
 
 end
 
-@testset "ConstrainedODEFunction" begin
+@testset "ConstrainedODEFunction constrained" begin
 
   ns = 5
   nc = 2
@@ -173,14 +173,17 @@ end
 
   B1 = Array{Float64}(undef,ns,nc)
   B2 = Array{Float64}(undef,nc,ns)
+  C = zeros(nc,nc)
   B1 .= 1:ns
   B2 .= transpose(B1)
-  p = [B1,B2]
+  p = [B1,B2,C]
 
   ode_rhs!(dy,y,x,p,t) = dy .= 1.01*y
   constraint_force!(dy,z,x,p) = dy .= p[1]*z
   constraint_rhs!(dz,x,p,t) = dz .= 1.0
   constraint_op!(dz,y,x,p) = dz .= p[2]*y
+  constraint_reg!(dz,z,x,p) = dz .= p[3]*z
+
 
   u₀ = solvector(state=y,constraint=z)
   du = zero(u₀)
@@ -195,6 +198,7 @@ end
   constraint_force(z,x,p) = p[1]*z
   constraint_rhs(x,p,t) = fill(1.0,nc)
   constraint_op(y,x,p) = p[2]*y
+  constraint_reg(z,x,p) = p[3]*z
 
   f = ConstrainedODEFunction(ode_rhs,constraint_rhs,
                             constraint_force,constraint_op)
@@ -212,6 +216,15 @@ end
   @test constraint(du) == 1.0 .- B2*y
   @test constraint(du) ≈ [-14.0, -14.0] atol=1e-12
 
+  f = ConstrainedODEFunction(ode_rhs!,constraint_rhs!,
+                              constraint_force!,constraint_op!,L,constraint_reg!,_func_cache=u₀)
+
+  f(du,u₀,p,0.0)
+  @test state(du) == 1.01*y .- B1*z .+ L*y
+  @test state(du) ≈ [1.01,-0.99,-2.99,-4.99,-6.99] atol=1e-12
+  @test constraint(du) == 1.0 .- B2*y .- C*z
+  @test constraint(du) ≈ [-14.0, -14.0] atol=1e-12
+
   f = ConstrainedODEFunction(ode_rhs,constraint_rhs,
                             constraint_force,constraint_op,L)
 
@@ -221,7 +234,26 @@ end
   @test constraint(du) == 1.0 .- B2*y
   @test constraint(du) ≈ [-14.0, -14.0] atol=1e-12
 
-  # Unconstrained system
+  f = ConstrainedODEFunction(ode_rhs,constraint_rhs,
+                            constraint_force,constraint_op,L,constraint_reg)
+
+  du = f(u₀,p,0.0)
+  @test state(du) == 1.01*y .- B1*z .+ L*y
+  @test state(du) ≈ [1.01,-0.99,-2.99,-4.99,-6.99] atol=1e-12
+  @test constraint(du) == 1.0 .- B2*y .- C*z
+  @test constraint(du) ≈ [-14.0, -14.0] atol=1e-12
+
+end
+
+@testset "ConstrainedODEFunction unconstrained" begin
+
+  ns = 5
+  y = ones(Float64,ns)
+  ode_rhs!(dy,y,x,p,t) = dy .= 1.01*y
+  ode_rhs(y,x,p,t) = 1.01*y
+  L = 2*I
+  p = []
+
   u₀ = solvector(state=y)
   du = zero(u₀)
   f = ConstrainedODEFunction(ode_rhs!,L,_func_cache=u₀)

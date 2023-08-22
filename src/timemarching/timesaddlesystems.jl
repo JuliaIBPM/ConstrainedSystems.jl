@@ -9,7 +9,10 @@ function SaddleSystem(A,f::ConstrainedODEFunction{true},p,pold,ducache,solver)
     @inline B₂(y) = (zero_vec!(ducache);
                      _constraint_neg_B2!(ducache,f,solvector(state=y,constraint=nullz,aux_state=du_aux),p,0.0);
                      constraint(ducache) .*= -1.0; return constraint(ducache))
-    SaddleSystem(A,B₂,B₁ᵀ,mainvector(ducache),solver=solver)
+    @inline C(z) = (zero_vec!(ducache);
+                    _constraint_neg_C!(ducache,f,solvector(state=nully,constraint=z,aux_state=du_aux),p,0.0);
+                     constraint(ducache) .*= -1.0; return constraint(ducache))
+    SaddleSystem(A,B₂,B₁ᵀ,C,mainvector(ducache),solver=solver)
 end
 
 # called directly by oop algorithms
@@ -22,7 +25,10 @@ function SaddleSystem(A,f::ConstrainedODEFunction{false},p,pold,ducache,solver)
     @inline B₂(y) = (zero_vec!(ducache);
                      ducache .= _constraint_neg_B2(f,solvector(state=y,constraint=nullz,aux_state=du_aux),p,0.0);
                      constraint(ducache) .*= -1.0; return constraint(ducache))
-    SaddleSystem(A,B₂,B₁ᵀ,mainvector(ducache),solver=solver)
+    @inline C(z) = (zero_vec!(ducache);
+                     ducache .= _constraint_neg_C(f,solvector(state=nully,constraint=z,aux_state=du_aux),p,0.0);
+                     constraint(ducache) .*= -1.0; return constraint(ducache))
+    SaddleSystem(A,B₂,B₁ᵀ,C,mainvector(ducache),solver=solver)
 end
 
 # this version is called by in-place algorithms
