@@ -10,7 +10,7 @@ This package contains several tools for solving and advancing (large-scale) dyna
 
 dy/dt = L y - B<sub>1</sub><sup>T</sup> z + r<sub>1</sub>(y,t)
 
-B<sub>2</sub> y = r<sub>2</sub>(y,t)
+B<sub>2</sub> y + C z = r<sub>2</sub>(y,t)
 
 y(0) = y<sub>0</sub>
 
