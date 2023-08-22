@@ -19,7 +19,7 @@
 [ConstrainedSystems.jl](https://github.com/JuliaIBPM/ConstrainedSystems.jl) is equipped with tools for solving systems of equations of the
 general form of half-explicit differential-algebraic equations,
 
-$$\ddt y = L y - B_1^T(y,t) z + r_1(y,t), \quad B_2(y,t) y = r_2(t), \quad y(0) = y_0$$
+$$\ddt y = L y - B_1^T(y,t) z + r_1(y,t), \quad B_2(y,t) y + C(y,t) z = r_2(t), \quad y(0) = y_0$$
 
 where $z$ is the Lagrange multiplier for enforcing the constraints on $y$. Note
 that the constraint operators may depend on the state and on time. The linear operator $L$ may be a matrix or a scalar, but is generally independent of time. (The method of integrating factors can deal with time-dependent $L$, but we don't encounter such systems in the constrained systems context so we won't discuss them.) Our objective is to solve
@@ -38,7 +38,8 @@ Let's demonstrate this on the example of heat diffusion from a circular ring who
 is held constant. In this case, $L$ is the discrete Laplace operator times the heat diffusivity,
 $r_1$ is zero (in the absence of volumetric heating sources), and $r_2$ is the temperature of
 the ring. The operators $B_1^T$ and $B_2$ will be the regularization and interpolation
-operators between discrete point-wise data on the ring and the field data.
+operators between discrete point-wise data on the ring and the field data. We will also
+include a $C$ operator that slightly regularizes the constraint.
 
 The ring will have radius $1/2$ and fixed temperature $1$, and
 the heat diffusivity is $1$. (In other words, the problem has been non-dimensionalized
@@ -90,13 +91,18 @@ boundary_constraint_force!(dw::Nodes,z::ScalarData,x,p) = dw .= Hmat*z # This is
 boundary_constraint_op!(dz::ScalarData,y::Nodes,x,p) = dz .= Emat*y;  # This is B2
 
 #=
+Construct a constraint regularization operator (the $C$ operator)
+=#
+boundary_constraint_reg!(dz::ScalarData,z::ScalarData,x,p) = dz .= -0.1*z; # This is C
+
+#=
 Note that these last two functions are also in-place, and return data of the same
 respective types as $r_1$ and $r_2$.
 
 All of these are assembled into a single `ConstrainedODEFunction`:
 =#
 f = ConstrainedODEFunction(diffusion_rhs!,boundary_constraint_rhs!,boundary_constraint_force!,
-                          boundary_constraint_op!,L,_func_cache=u₀)
+                          boundary_constraint_op!,L,boundary_constraint_reg!,_func_cache=u₀)
 
 #=
 With the last argument, we supplied a cache variable to enable evaluation of this function.
@@ -123,6 +129,11 @@ plot!(xb,yb,linecolor=:black,linewidth=1.5)
 From a side view, we can see that it enforces the boundary condition:
 =#
 plot(xg,state(sol.u[end])[65,:],xlabel="x",ylabel="u(x,1)")
+
+#=
+The Lagrange multiplier distribution is nearly uniform
+=#
+plot(constraint(sol.u[end]),ylim=(-0.5,0))
 
 #=
 ## Systems with variable constraints
