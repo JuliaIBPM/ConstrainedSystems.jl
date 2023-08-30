@@ -99,7 +99,7 @@ solutions2 = [solve(prob,IFHEEuler();dt=dts[i]) for i=1:length(dts)]
 𝒪est1 = compute𝒪est(solutions1,1,xexact)
 𝒪est2 = compute𝒪est(solutions2,1,xexact)
 
-@test 𝒪est1[:l2][1] ≈ 1 atol=testTol
+@test 𝒪est1[:l2][1] ≈ 1 atol=testTol # IFHERK only 1st order convergent on this problem
 @test 𝒪est2[:l2][1] ≈ 1 atol=testTol
 
 ### out of place ###
@@ -177,7 +177,7 @@ solutions2 = [solve(prob,IFHEEuler();dt=dts[i]) for i=1:length(dts)]
 𝒪est1 = compute𝒪est(solutions1,1,xexact)
 𝒪est2 = compute𝒪est(solutions2,1,xexact)
 
-@test 𝒪est1[:l2][1] ≈ 1 atol=testTol
+@test 𝒪est1[:l2][1] ≈ 1 atol=testTol # IFHERK only 1st order convergent on this problem
 @test 𝒪est2[:l2][1] ≈ 1 atol=testTol
 
 end

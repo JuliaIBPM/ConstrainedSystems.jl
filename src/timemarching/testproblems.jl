@@ -344,15 +344,16 @@ function basic_constrained_if_problem_with_cmatrix(;tmax=1.0,iip=true)
   B1T = 1.0
   B2 = 1.0
   β = 1.2
-  p = [α,B1T,B2,β]
+  r2 = 1.0
+  p = [α,B1T,B2,β,r2]
 
   L = α*I
 
   ode_rhs!(dy,y,x,p,t) = fill!(dy,0.0)
   ode_rhs(y,x,p,t) = zero(y)
 
-  constraint_rhs!(dz,x,p,t) = fill!(dz,0.0)
-  constraint_rhs(x,p,t) = zeros(1)
+  constraint_rhs!(dz,x,p,t) = fill!(dz,p[5])
+  constraint_rhs(x,p,t) = p[5]*ones(1)
 
   function op_constraint_force!(dy::Vector{Float64},z::Vector{Float64},x,p)
     dy .= p[2]*z
@@ -381,8 +382,8 @@ function basic_constrained_if_problem_with_cmatrix(;tmax=1.0,iip=true)
   tspan = (0.0,tmax)
   prob = ODEProblem(f,u₀,tspan,p)
 
-  xexact(t) = exp((α+1/β)*t)*y0
-  yexact(t) = -xexact(t)/β
+  xexact(t) = exp((α+1/β)*t)*y0 + r2/β/(α+1/β)*(1 - exp((α+1/β)*t))
+  yexact(t) = (r2 - xexact(t))/β
 
   return prob, xexact, yexact
 end
