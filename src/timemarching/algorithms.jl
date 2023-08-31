@@ -89,13 +89,16 @@ function alg_cache(alg::LiskaIFHERK{solverType},u,rate_prototype,uEltypeNoUnits,
   tab = LiskaIFHERKConstantCache{sc,ni,solverType}(constvalue(uBottomEltypeNoUnits),
                                                 constvalue(tTypeNoUnits))
 
+  @unpack ã11,ã22,ã33 = tab
+
   L = _fetch_ode_L(f)
   Hhalfdt = exp(L,-dt/2,y)
   Hzero = exp(L,zero(dt),y)
 
   S = []
-  push!(S,SaddleSystem(Hhalfdt,f,p,p,dutmp,solverType))
-  push!(S,SaddleSystem(Hzero,f,p,p,dutmp,solverType))
+  push!(S,SaddleSystem(Hhalfdt,f,p,p,dutmp,solverType;cfact=1.0/(ã11*dt)))
+  push!(S,SaddleSystem(Hhalfdt,f,p,p,dutmp,solverType;cfact=1.0/(ã22*dt)))
+  push!(S,SaddleSystem(Hzero,f,p,p,dutmp,solverType;cfact=1.0/(ã33*dt)))
 
 
   LiskaIFHERKCache{sc,ni,solverType}(u,uprev,k1,k2,k3,utmp,udiff,dutmp,fsalfirst,
@@ -155,7 +158,7 @@ function alg_cache(alg::IFHEEuler{solverType},u,rate_prototype,uEltypeNoUnits,uB
   Hdt = exp(_fetch_ode_L(f),-dt,y)
 
   S = []
-  push!(S,SaddleSystem(Hdt,f,p,p,dutmp,solverType))
+  push!(S,SaddleSystem(Hdt,f,p,p,dutmp,solverType;cfact=1.0/dt))
 
   IFHEEulerCache{sc,ni,solverType}(u,uprev,k1,utmp,udiff,dutmp,fsalfirst,
                                   Hdt,S,deepcopy(p),k)
@@ -255,15 +258,15 @@ end
     while err > tol && numiter <= maxiter
       udiff .= u
       param_update_func(pnew_ptr,u,pold_ptr,ttmp)
-      S[1] = SaddleSystem(S[1],Hhalfdt,f,pnew_ptr,pold_ptr,cache)
+      S[2] = SaddleSystem(S[2],Hhalfdt,f,pnew_ptr,pold_ptr,cache)
       _constraint_r2!(utmp,f,u,pnew_ptr,ttmp)
-      mainvector(u) .= S[1]\mainvector(utmp)
+      mainvector(u) .= S[2]\mainvector(utmp)
       @.. udiff -= u
       numiter += 1
       err = internalnorm(udiff,ttmp)
     end
     zero_vec!(xtmp)
-    B1_times_z!(utmp,S[1])
+    B1_times_z!(utmp,S[2])
     pold_ptr = p
     pnew_ptr = ptmp
 
@@ -287,9 +290,9 @@ end
     while err > tol && numiter <= maxiter
       udiff .= u
       param_update_func(pnew_ptr,u,pold_ptr,ttmp)
-      S[2] = SaddleSystem(S[2],Hzero,f,pnew_ptr,pold_ptr,cache)
+      S[3] = SaddleSystem(S[3],Hzero,f,pnew_ptr,pold_ptr,cache)
       _constraint_r2!(utmp,f,u,pnew_ptr,t+dt)
-      mainvector(u) .= S[2]\mainvector(utmp)
+      mainvector(u) .= S[3]\mainvector(utmp)
       @.. udiff -= u
       numiter += 1
       err = internalnorm(udiff,ttmp)
@@ -355,7 +358,7 @@ end
       udiff .= u
       ptmp = param_update_func(u,pold_ptr,ttmp)
       pnew_ptr = ptmp
-      S = SaddleSystem(Hhalfdt,f,pnew_ptr,pold_ptr,ducache,solverType)
+      S = SaddleSystem(Hhalfdt,f,pnew_ptr,pold_ptr,ducache,solverType;cfact=1.0/(ã11*dt))
       constraint(utmp) .= constraint(_constraint_r2(f,u,pnew_ptr,ttmp))
       mainvector(u) .= S\mainvector(utmp)
       B1_times_z!(ducache,S)
@@ -386,7 +389,7 @@ end
     while err > tol && numiter <= maxiter
       udiff .= u
       ptmp = param_update_func(u,pold_ptr,ttmp)
-      S = SaddleSystem(Hhalfdt,f,ptmp,pold_ptr,ducache,solverType)
+      S = SaddleSystem(Hhalfdt,f,ptmp,pold_ptr,ducache,solverType;cfact=1.0/(ã22*dt))
       constraint(utmp) .= constraint(_constraint_r2(f,u,ptmp,ttmp))
       mainvector(u) .= S\mainvector(utmp)
       B1_times_z!(ducache,S)
@@ -417,7 +420,7 @@ end
     while err > tol && numiter <= maxiter
       udiff .= u
       ptmp = param_update_func(u,pold_ptr,ttmp)
-      S = SaddleSystem(Hzero,f,ptmp,pold_ptr,ducache,solverType)
+      S = SaddleSystem(Hzero,f,ptmp,pold_ptr,ducache,solverType;cfact=1.0/(ã33*dt))
       constraint(utmp) .= constraint(_constraint_r2(f,u,ptmp,ttmp))
       mainvector(u) .= S\mainvector(utmp)
       @.. udiff -= u
@@ -496,7 +499,7 @@ end
       @.. udiff -= u
       numiter += 1
       err = internalnorm(udiff,ttmp)
-      #println("error = ",err)
+      #println("numiter = ",numiter, ", error = ",err)
     end
     @.. z /= dt
 
@@ -553,7 +556,7 @@ end
   while err > tol && numiter <= maxiter
     udiff .= u
     pnew_ptr = param_update_func(u,pold_ptr,t+dt)
-    S = SaddleSystem(Hdt,f,pnew_ptr,pold_ptr,ducache,solverType)
+    S = SaddleSystem(Hdt,f,pnew_ptr,pold_ptr,ducache,solverType;cfact=1.0/dt)
     constraint(utmp) .= constraint(_constraint_r2(f,u,pnew_ptr,t+dt))
     mainvector(u) .= S\mainvector(utmp)
     @.. udiff -= u

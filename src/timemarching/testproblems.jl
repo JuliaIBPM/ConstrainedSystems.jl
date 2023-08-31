@@ -331,3 +331,59 @@ function partitioned_problem(;tmax=1.0,iip=true)
   return prob, xexact, yexact
 
 end
+
+function basic_constrained_if_problem_with_cmatrix(;tmax=1.0,iip=true)
+
+  y0 = 1
+  y₀ = Float64[y0]
+  z₀ = Float64[0]
+  u₀ = solvector(state=y₀,constraint=z₀)
+  du = deepcopy(u₀)
+
+  α = -1.0
+  B1T = 1.0
+  B2 = 1.0
+  β = 1.2
+  r2 = 1.0
+  p = [α,B1T,B2,β,r2]
+
+  L = α*I
+
+  ode_rhs!(dy,y,x,p,t) = fill!(dy,0.0)
+  ode_rhs(y,x,p,t) = zero(y)
+
+  constraint_rhs!(dz,x,p,t) = fill!(dz,p[5])
+  constraint_rhs(x,p,t) = p[5]*ones(1)
+
+  function op_constraint_force!(dy::Vector{Float64},z::Vector{Float64},x,p)
+    dy .= p[2]*z
+  end
+
+  op_constraint_force(z::Vector{Float64},x,p) = op_constraint_force!(deepcopy(y₀),z,x,p)
+
+  function constraint_op!(dz::Vector{Float64},y::Vector{Float64},x,p)
+    dz .= p[3]*y
+  end
+  constraint_op(y::Vector{Float64},x,p) = constraint_op!(deepcopy(z₀),y,x,p)
+
+  function constraint_reg!(dz::Vector{Float64},z::Vector{Float64},x,p)
+    dz .= p[4]*z
+  end
+  constraint_reg(z::Vector{Float64},x,p) = constraint_reg!(deepcopy(z₀),z,x,p)
+
+  if iip
+    f = ConstrainedODEFunction(ode_rhs!,constraint_rhs!,op_constraint_force!,
+                              constraint_op!,L,constraint_reg!,_func_cache=deepcopy(du))
+  else
+    f = ConstrainedODEFunction(ode_rhs,constraint_rhs,op_constraint_force,
+                              constraint_op,L,constraint_reg)
+   end
+
+  tspan = (0.0,tmax)
+  prob = ODEProblem(f,u₀,tspan,p)
+
+  xexact(t) = exp((α+1/β)*t)*y0 + r2/β/(α+1/β)*(1 - exp((α+1/β)*t))
+  yexact(t) = (r2 - xexact(t))/β
+
+  return prob, xexact, yexact
+end
