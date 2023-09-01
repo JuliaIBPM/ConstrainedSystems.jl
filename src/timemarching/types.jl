@@ -40,7 +40,7 @@ has_exp(::DiffEqLinearOperator) = true
 exp(L::AbstractMatrix,t,x) = exp(factorize(L)*t)
 exp(L::UniformScaling,t,x) = exp(Diagonal(L,length(x))*t)
 
-implicit_operator(L::Matrix,a::Real) = I - a*L
+implicit_operator(L::AbstractMatrix,a::Real) = I - a*L
 implicit_operator(f::DiffEqLinearOperator,args...) = implicit_operator(f.L,args...)
 implicit_operator(f::ODEFunction,args...) = implicit_operator(f.f,args...)
 
@@ -203,7 +203,7 @@ end
 @inline _fetch_constraint_neg_C(f::ConstrainedODEFunction) = f.conf.f2.f.f2
 
 
-for fcn in (:_ode_L,:_ode_r1,:_ode_r1imp,:_ode_neg_B1,:_constraint_neg_B2,:_constraint_neg_C,:_constraint_r2)
+for fcn in (:_ode_L,:_ode_r1,:_ode_r1imp,:_ode_neg_B1,:_constraint_neg_B2,:_constraint_neg_C,:_constraint_r2,:_ode_implicit_rhs)
   fetchfcn = Symbol("_fetch",string(fcn))
   iipfcn = Symbol(string(fcn),"!")
   @eval $iipfcn(du,f::ConstrainedODEFunction,u,p,t) = $fetchfcn(f)(du,u,p,t)
