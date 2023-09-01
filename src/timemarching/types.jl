@@ -163,11 +163,10 @@ function ConstrainedODEFunction(r1,r2,B1,B2,L=DiffEqLinearOperator(0*I),C=nothin
     local_cache = deepcopy(_func_cache)
     zero_vec!(local_cache)
 
-    odef_imp = SplitFunction(_complete_B1(B1,Val(iip)),
+    odef_imp_nl = SplitFunction(_complete_B1(B1,Val(iip)),
                              _complete_r1imp(r1imp,Val(iip));_func_cache=deepcopy(local_cache))
-    odef_nl = SplitFunction(_complete_r1(r1,Val(iip),_func_cache=local_cache),
-                            odef_imp;_func_cache=deepcopy(local_cache))
-    odef = SplitFunction(L_local, odef_nl ;_func_cache=deepcopy(local_cache))
+    odef_imp = SplitFunction(L_local,odef_imp_nl;_func_cache=deepcopy(local_cache))
+    odef = SplitFunction(_complete_r1(r1,Val(iip),_func_cache=local_cache), odef_imp ;_func_cache=deepcopy(local_cache))
     conf_lhs = SplitFunction(_complete_B2(B2,Val(iip)),_complete_C(C,Val(iip));_func_cache=deepcopy(local_cache))
     conf = SplitFunction(_complete_r2(r2,Val(iip)),conf_lhs;_func_cache=deepcopy(local_cache))
 
@@ -193,10 +192,12 @@ function Base.show(io::IO, m::MIME"text/plain",f::ConstrainedODEFunction{iip,sta
 end
 
 # Here is where we define the structure of the function
-@inline _fetch_ode_L(f::ConstrainedODEFunction) = f.odef.f1
-@inline _fetch_ode_r1(f::ConstrainedODEFunction) = f.odef.f2.f.f1
-@inline _fetch_ode_neg_B1(f::ConstrainedODEFunction) = f.odef.f2.f.f2.f.f1
-@inline _fetch_ode_r1imp(f::ConstrainedODEFunction) = f.odef.f2.f.f2.f.f2
+@inline _fetch_ode_r1(f::ConstrainedODEFunction) = f.odef.f1
+@inline _fetch_ode_implicit_rhs(f::ConstrainedODEFunction) = f.odef.f2
+@inline _fetch_ode_L(f::ConstrainedODEFunction) = _fetch_ode_implicit_rhs(f).f.f1
+@inline _fetch_ode_neg_B1(f::ConstrainedODEFunction) = _fetch_ode_implicit_rhs(f).f.f2.f.f1
+@inline _fetch_ode_r1imp(f::ConstrainedODEFunction) = _fetch_ode_implicit_rhs(f).f.f2.f.f2
+
 @inline _fetch_constraint_r2(f::ConstrainedODEFunction) = f.conf.f1
 @inline _fetch_constraint_neg_B2(f::ConstrainedODEFunction) = f.conf.f2.f.f1
 @inline _fetch_constraint_neg_C(f::ConstrainedODEFunction) = f.conf.f2.f.f2
