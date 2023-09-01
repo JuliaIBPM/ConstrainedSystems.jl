@@ -152,8 +152,8 @@ function ConstrainedODEFunction(r1,r2,B1,B2,L=DiffEqLinearOperator(0*I),C=nothin
     allempty(r2,B1,B2) || noneempty(r2,B1,B2) || error("Inconsistent null operators")
     unconstrained = allempty(r2,B1,B2)
 
-    allinplace(r1,r2,B1,B2) || alloutofplace(r1,r2,B1,B2) || error("Inconsistent function signatures")
-    iip = allinplace(r1,r2,B1,B2)
+    allinplace(r1,r2,B1,B2,r1imp) || alloutofplace(r1,r2,B1,B2,r1imp) || error("Inconsistent function signatures")
+    iip = allinplace(r1,r2,B1,B2,r1imp)
 
     static = param_update_func == DEFAULT_PARAM_UPDATE_FUNC ? true : false
 
@@ -217,6 +217,13 @@ noneempty(r2,B1,B2) = !(isnothing(r2) || isnothing(B1) || isnothing(B2))
 
 allinplace(r1,r2,B1,B2) = _isinplace_r1(r1) && _isinplace_r2(r2) && _isinplace_B1(B1) && _isinplace_B2(B2)
 alloutofplace(r1,r2,B1,B2) = _isoop_r1(r1) && _isoop_r2(r2) && _isoop_B1(B1) && _isoop_B2(B2)
+
+allinplace(r1,r2,B1,B2,r1imp) = allinplace(r1,r2,B1,B2) && _isinplace_r1imp(r1imp)
+allinplace(r1,r2,B1,B2,::Nothing) = allinplace(r1,r2,B1,B2)
+
+alloutofplace(r1,r2,B1,B2,r1imp) = alloutofplace(r1,r2,B1,B2) && _isoop_r1imp(r1imp)
+alloutofplace(r1,r2,B1,B2,::Nothing) = alloutofplace(r1,r2,B1,B2)
+
 
 allinplace(r1,::Nothing,::Nothing,::Nothing) = _isinplace_r1(r1)
 alloutofplace(r1,::Nothing,::Nothing,::Nothing) = _isoop_r1(r1)

@@ -635,7 +635,7 @@ end
   integrator.u = u
 end
 
-#### Half-explicit Trapezoidal/Adams-Bashforth 2 ####
+#### Half-explicit Trapezoidal/Adams-Bashforth 2 (HETrapezoidalAB2) ####
 
 function initialize!(integrator,cache::HETrapezoidalAB2Cache)
     @unpack k,fsalfirst = cache

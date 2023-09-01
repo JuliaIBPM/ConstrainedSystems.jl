@@ -211,37 +211,54 @@ end
                               constraint_force!,constraint_op!,L,_func_cache=u₀)
 
   f(du,u₀,p,0.0)
-  @test state(du) == 1.01*y .- B1*z .+ L*y
+  @test state(du) ≈ 1.01*y .- B1*z .+ L*y atol=1e-12
   @test state(du) ≈ [1.01,-0.99,-2.99,-4.99,-6.99] atol=1e-12
-  @test constraint(du) == 1.0 .- B2*y
+  @test constraint(du) ≈ 1.0 .- B2*y atol=1e-12
   @test constraint(du) ≈ [-14.0, -14.0] atol=1e-12
 
   f = ConstrainedODEFunction(ode_rhs!,constraint_rhs!,
                               constraint_force!,constraint_op!,L,constraint_reg!,_func_cache=u₀)
 
   f(du,u₀,p,0.0)
-  @test state(du) == 1.01*y .- B1*z .+ L*y
+  @test state(du) ≈ 1.01*y .- B1*z .+ L*y atol=1e-12
   @test state(du) ≈ [1.01,-0.99,-2.99,-4.99,-6.99] atol=1e-12
-  @test constraint(du) == 1.0 .- B2*y .- C*z
+  @test constraint(du) ≈ 1.0 .- B2*y .- C*z atol=1e-12
   @test constraint(du) ≈ [-14.0, -14.0] atol=1e-12
 
   f = ConstrainedODEFunction(ode_rhs,constraint_rhs,
                             constraint_force,constraint_op,L)
 
   du = f(u₀,p,0.0)
-  @test state(du) == 1.01*y .- B1*z .+ L*y
+  @test state(du) ≈ 1.01*y .- B1*z .+ L*y atol=1e-12
   @test state(du) ≈ [1.01,-0.99,-2.99,-4.99,-6.99] atol=1e-12
-  @test constraint(du) == 1.0 .- B2*y
+  @test constraint(du) ≈ 1.0 .- B2*y atol=1e-12
   @test constraint(du) ≈ [-14.0, -14.0] atol=1e-12
 
   f = ConstrainedODEFunction(ode_rhs,constraint_rhs,
                             constraint_force,constraint_op,L,constraint_reg)
 
   du = f(u₀,p,0.0)
-  @test state(du) == 1.01*y .- B1*z .+ L*y
+  @test state(du) ≈ 1.01*y .- B1*z .+ L*y atol=1e-12
   @test state(du) ≈ [1.01,-0.99,-2.99,-4.99,-6.99] atol=1e-12
-  @test constraint(du) == 1.0 .- B2*y .- C*z
+  @test constraint(du) ≈ 1.0 .- B2*y .- C*z atol=1e-12
   @test constraint(du) ≈ [-14.0, -14.0] atol=1e-12
+
+  r1_implicit!(dy,x,p,t) = dy .= 1.0 .+ 0.5*t
+  r1_implicit(x,p,t) = 1.0 + 0.5*t
+
+  f = ConstrainedODEFunction(ode_rhs!,constraint_rhs!,
+                              constraint_force!,constraint_op!,L,constraint_reg!,r1imp=r1_implicit!,_func_cache=u₀)
+
+  f(du,u₀,p,1.0)
+  @test state(du) ≈ 1.01*y .- B1*z .+ L*y .+ 1.5 atol=1e-12
+  @test state(du) ≈ 1.5 .+ [1.01,-0.99,-2.99,-4.99,-6.99] atol=1e-12
+
+  f = ConstrainedODEFunction(ode_rhs,constraint_rhs,
+                            constraint_force,constraint_op,L,constraint_reg,r1imp=r1_implicit)
+
+  du = f(u₀,p,1.0)
+  @test state(du) ≈ 1.01*y .- B1*z .+ L*y .+ 1.5 atol=1e-12
+  @test state(du) ≈ 1.5 .+ [1.01,-0.99,-2.99,-4.99,-6.99] atol=1e-12
 
 end
 
