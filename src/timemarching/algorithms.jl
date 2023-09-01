@@ -7,7 +7,7 @@ stats_field(integrator) = integrator.stats
 # LiskaIFHERK is scheme A in Liska and Colonius (JCP 2016)
 
 
-for (Alg,Order) in [(:WrayHERK,3),(:BraseyHairerHERK,3),(:LiskaIFHERK,2),(:IFHEEuler,1)]
+for (Alg,Order) in [(:WrayHERK,3),(:BraseyHairerHERK,3),(:LiskaIFHERK,2),(:IFHEEuler,1),(:HETrapezoidalAB2,2)]
     @eval struct $Alg{solverType} <: ConstrainedOrdinaryDiffEqAlgorithm
       maxiter :: Int
       tol :: Float64
@@ -170,6 +170,63 @@ function alg_cache(alg::IFHEEuler{solverType},u,rate_prototype,
                                   p,calck,::Val{false}) where {solverType}
   IFHEEulerConstantCache{isstatic(f),needs_iteration(f,u,p,rate_prototype),solverType}()
 end
+
+# Half-explicit trapezoidal-Adams/Bashforth 2
+
+@cache struct HETrapezoidalAB2Cache{sc,ni,solverType,uType,rateType,implicitType,saddleType,pType} <: ConstrainedODEMutableCache{sc,solverType}
+  u::uType
+  uprev::uType
+  ki::rateType
+  ke::rateType
+  utmp::uType  # cache
+  udiff::uType
+  dutmp::rateType # cache for rates
+  fsalfirst::rateType
+  A::implicitType
+  S::saddleType
+  ptmp::pType
+  k::rateType
+end
+
+struct HETrapezoidalAB2ConstantCache{sc,ni,solverType} <: ConstrainedODEConstantCache{sc,solverType}
+
+end
+
+HETrapezoidalAB2Cache{sc,ni,solverType}(u,uprev,ki,ke,utmp,udiff,dutmp,fsalfirst,
+                                A,S,ptmp,k) where {sc,ni,solverType} =
+        HETrapezoidalAB2Cache{sc,ni,solverType,typeof(u),typeof(ki),typeof(A),
+                        typeof(S),typeof(ptmp)}(u,uprev,ki,ke,utmp,udiff,dutmp,fsalfirst,
+                                                              A,S,ptmp,k)
+function alg_cache(alg::HETrapezoidalAB2Cache{solverType},u,rate_prototype,uEltypeNoUnits,uBottomEltypeNoUnits,
+                   tTypeNoUnits,uprev,uprev2,f,t,dt,reltol,p,calck,::Val{true}) where {solverType}
+
+  u isa ArrayPartition || error("u must be of type ArrayPartition")
+
+  y, z = state(u), constraint(u)
+
+  utmp, udiff = (zero(u) for i in 1:2)
+  ki, ke, dutmp, fsalfirst, k = (zero(rate_prototype) for i in 1:5)
+
+  sc = isstatic(f)
+  ni = needs_iteration(f,u,p,rate_prototype)
+
+  α = 1//2
+  A = implicit_operator(_fetch_ode_L(f),α*dt)
+
+  S = []
+  push!(S,SaddleSystem(A,f,p,p,dutmp,solverType;cfact=1.0/(α*dt)))
+
+  HETrapezoidalAB2Cache{sc,ni,solverType}(u,uprev,ki,ke,utmp,udiff,dutmp,fsalfirst,
+                                  A,S,deepcopy(p),k)
+end
+
+function alg_cache(alg::HETrapezoidalAB2Cache{solverType},u,rate_prototype,
+                                  uEltypeNoUnits,uBottomEltypeNoUnits,
+                                  tTypeNoUnits,uprev,uprev2,f,t,dt,reltol,
+                                  p,calck,::Val{false}) where {solverType}
+  HETrapezoidalAB2CacheConstantCache{isstatic(f),needs_iteration(f,u,p,rate_prototype),solverType}()
+end
+
 
 
 #######
@@ -526,6 +583,140 @@ function initialize!(integrator,cache::IFHEEulerConstantCache)
 end
 
 @muladd function perform_step!(integrator,cache::IFHEEulerConstantCache{sc,ni,solverType},repeat_step=false) where {sc,ni,solverType}
+  @unpack t,dt,uprev,f,p,opts,alg = integrator
+  @unpack internalnorm = opts
+  @unpack maxiter, tol = alg
+  @unpack param_update_func = f
+
+  init_err = float(1)
+  #init_iter = ni ? 1 : maxiter
+  init_iter = maxiter  # First-order method does not need iteration
+
+
+  # set up some cache variables
+  udiff = deepcopy(uprev)
+  ducache = deepcopy(uprev)
+  ptmp = deepcopy(p)
+  L = _fetch_ode_L(f)
+  Hdt = exp(L,-dt,state(uprev))
+  pold_ptr = p
+  pnew_ptr = ptmp
+
+  k1 = _ode_r1(f,uprev,pold_ptr,t)
+  stats_field(integrator).nf += 1
+  @.. k1 *= dt
+  utmp = @.. uprev + k1
+
+  # if applicable, update p, construct new saddle system here, using Hdt
+  err, numiter = init_err, init_iter
+  u = deepcopy(utmp)
+  while err > tol && numiter <= maxiter
+    udiff .= u
+    pnew_ptr = param_update_func(u,pold_ptr,t+dt)
+    S = SaddleSystem(Hdt,f,pnew_ptr,pold_ptr,ducache,solverType;cfact=1.0/dt)
+    constraint(utmp) .= constraint(_constraint_r2(f,u,pnew_ptr,t+dt))
+    mainvector(u) .= S\mainvector(utmp)
+    @.. udiff -= u
+    numiter += 1
+    err = internalnorm(udiff,t+dt)
+    #println("error = ",err)
+  end
+  z = constraint(u)
+  @.. z /= dt
+
+  # Final steps
+  integrator.p = param_update_func(u,pold_ptr,t)
+  k = f.odef(u, integrator.p, t+dt)
+  stats_field(integrator).nf += 1
+
+  integrator.fsallast = k
+  integrator.k[1] = integrator.fsalfirst
+  integrator.k[2] = integrator.fsallast
+  integrator.u = u
+end
+
+#### Half-explicit Trapezoidal/Adams-Bashforth 2 ####
+
+function initialize!(integrator,cache::HETrapezoidalAB2Cache)
+    @unpack k,fsalfirst = cache
+
+    integrator.fsalfirst = fsalfirst
+    integrator.fsallast = k
+    integrator.kshortsize = 2
+    resize!(integrator.k, integrator.kshortsize)
+    integrator.k[1] = integrator.fsalfirst
+    integrator.k[2] = integrator.fsallast
+    integrator.f.odef(integrator.fsalfirst, integrator.uprev, integrator.p, integrator.t) # Pre-start fsal
+    integrator.f.param_update_func(integrator.p,integrator.uprev,integrator.p,integrator.t)
+    stats_field(integrator).nf += 1
+
+end
+
+@muladd function perform_step!(integrator,cache::HETrapezoidalAB2Cache{sc,ni,solverType},repeat_step=false) where {sc,ni,solverType}
+    @unpack t,dt,uprev,u,f,p,opts,alg = integrator
+    @unpack internalnorm = opts
+    @unpack ki,ke,utmp,udiff,dutmp,fsalfirst,S,ptmp,k = cache
+    @unpack maxiter, tol = alg
+    @unpack param_update_func = f
+
+    init_err = float(1)
+    #init_iter = ni ? 1 : maxiter
+    init_iter = maxiter  # First-order method does not need iteration
+
+    # aliases to the state and constraint parts
+    ytmp, ztmp = state(utmp), constraint(utmp)
+    z = constraint(u)
+    pold_ptr = p
+    pnew_ptr = ptmp
+
+    ttmp = t
+    u .= uprev
+
+    _ode_r1!(k1,f,u,pold_ptr,ttmp)
+    stats_field(integrator).nf += 1
+    @.. k1 *= dt
+    @.. utmp = uprev + k1
+    ttmp = t + dt
+
+    # if applicable, update p, construct new saddle system here, using Hdt
+    err, numiter = init_err, init_iter
+    u .= utmp
+    while err > tol && numiter <= maxiter
+      udiff .= u
+      param_update_func(pnew_ptr,u,pold_ptr,ttmp)
+      S[1] = SaddleSystem(S[1],Hdt,f,pnew_ptr,pold_ptr,cache)
+      _constraint_r2!(utmp,f,u,pnew_ptr,t+dt)
+      mainvector(u) .= S[1]\mainvector(utmp)
+      @.. udiff -= u
+      numiter += 1
+      err = internalnorm(udiff,ttmp)
+      #println("numiter = ",numiter, ", error = ",err)
+    end
+    @.. z /= dt
+
+    # Final steps
+    param_update_func(p,u,pold_ptr,t)
+    f.odef(integrator.fsallast, u, p, t+dt)
+    stats_field(integrator).nf += 1
+
+    return nothing
+end
+
+
+function initialize!(integrator,cache::HETrapezoidalAB2ConstantCache)
+  integrator.kshortsize = 2
+  integrator.k = typeof(integrator.k)(undef, integrator.kshortsize)
+  integrator.fsalfirst = integrator.f.odef(integrator.uprev, integrator.p, integrator.t) # Pre-start fsal
+  integrator.p = integrator.f.param_update_func(integrator.uprev,integrator.p,integrator.t)
+  stats_field(integrator).nf += 1
+
+  # Avoid undefined entries if k is an array of arrays
+  integrator.fsallast = zero(integrator.fsalfirst)
+  integrator.k[1] = integrator.fsalfirst
+  integrator.k[2] = integrator.fsallast
+end
+
+@muladd function perform_step!(integrator,cache::HETrapezoidalAB2ConstantCache{sc,ni,solverType},repeat_step=false) where {sc,ni,solverType}
   @unpack t,dt,uprev,f,p,opts,alg = integrator
   @unpack internalnorm = opts
   @unpack maxiter, tol = alg
