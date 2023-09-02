@@ -210,6 +210,21 @@ for fcn in (:_ode_L,:_ode_r1,:_ode_r1imp,:_ode_neg_B1,:_constraint_neg_B2,:_cons
   @eval $fcn(f::ConstrainedODEFunction,u,p,t) = $fetchfcn(f)(u,p,t)
 end
 
+function _ode_full_rhs!(du,f::ConstrainedODEFunction,u,p,t)
+  @unpack odef = f
+  @unpack cache = odef
+  zero_vec!(cache)
+  zero_vec!(du)
+  _ode_r1!(cache,f,u,p,t)
+  _ode_r1imp!(du,f,u,p,t)
+  du .+= cache
+  return du
+end
+
+function _ode_full_rhs(f::ConstrainedODEFunction,u,p,t)
+  return _ode_r1(f,u,p,t) + _ode_r1imp(f,u,p,t)
+end
+
 allempty(::Nothing,::Nothing,::Nothing) = true
 allempty(r2,B1,B2) = false
 noneempty(r2,B1,B2) = !(isnothing(r2) || isnothing(B1) || isnothing(B2))

@@ -287,7 +287,7 @@ end
     u .= uprev
 
     ## Stage 1
-    _ode_r1!(k1,f,u,pold_ptr,ttmp)
+    _ode_full_rhs!(k1,f,u,pold_ptr,ttmp)
     stats_field(integrator).nf += 1
     @.. k1 *= dt*ã11
     @.. utmp = uprev + k1
@@ -320,7 +320,7 @@ end
     @.. k1 = (k1-utmp)/(dt*ã11)  # r1(y,t) - B1T*z
 
     ## Stage 2
-    _ode_r1!(k2,f,u,pold_ptr,ttmp)
+    _ode_full_rhs!(k2,f,u,pold_ptr,ttmp)
     stats_field(integrator).nf += 1
     @.. k2 *= dt*ã22
     @.. utmp = uprev + k2 + dt*ã21*k1
@@ -352,7 +352,7 @@ end
     @.. k2 = (k2-utmp)/(dt*ã22)
 
     ## Stage 3
-    _ode_r1!(k3,f,u,pold_ptr,ttmp)
+    _ode_full_rhs!(k3,f,u,pold_ptr,ttmp)
     stats_field(integrator).nf += 1
     @.. k3 *= dt*ã33
     @.. utmp = uprev + k3 + dt*ã32*k2 + dt*ã31*k1
@@ -418,7 +418,7 @@ end
 
     ## Stage 1
     ttmp = t
-    k1 = _ode_r1(f,uprev,pold_ptr,ttmp)
+    k1 = _ode_full_rhs(f,uprev,pold_ptr,ttmp)
     stats_field(integrator).nf += 1
     @.. k1 *= dt*ã11
     utmp = @.. uprev + k1
@@ -452,7 +452,7 @@ end
     @.. k1 = (k1-utmp)/(dt*ã11)  # r1(y,t) - B1T*z
 
     ## Stage 2
-    k2 = _ode_r1(f,u,pold_ptr,ttmp)
+    k2 = _ode_full_rhs(f,u,pold_ptr,ttmp)
     stats_field(integrator).nf += 1
     @.. k2 *= dt*ã22
     @.. utmp = uprev + k2 + dt*ã21*k1
@@ -483,7 +483,7 @@ end
     @.. k2 = (k2-utmp)/(dt*ã22)
 
     ## Stage 3
-    k3 = _ode_r1(f,u,pold_ptr,ttmp)
+    k3 = _ode_full_rhs(f,u,pold_ptr,ttmp)
     stats_field(integrator).nf += 1
     @.. k3 *= dt*ã33
     @.. utmp = uprev + k3 + dt*ã32*k2 + dt*ã31*k1
@@ -556,7 +556,7 @@ end
     ttmp = t
     u .= uprev
 
-    _ode_r1!(k1,f,u,pold_ptr,ttmp)
+    _ode_full_rhs!(k1,f,u,pold_ptr,ttmp)
     stats_field(integrator).nf += 1
     @.. k1 *= dt
     @.. utmp = uprev + k1
@@ -620,7 +620,7 @@ end
   pold_ptr = p
   pnew_ptr = ptmp
 
-  k1 = _ode_r1(f,uprev,pold_ptr,t)
+  k1 = _ode_full_rhs(f,uprev,pold_ptr,t)
   stats_field(integrator).nf += 1
   @.. k1 *= dt
   utmp = @.. uprev + k1
@@ -680,7 +680,7 @@ end
 
     init_err = float(1)
     #init_iter = ni ? 1 : maxiter
-    init_iter = maxiter  # First-order method does not need iteration
+    init_iter = maxiter
 
     # aliases to the state and constraint parts
     ytmp, ztmp = state(utmp), constraint(utmp)
@@ -695,14 +695,14 @@ end
 
     _ode_r1!(ke,f,utmp,pold_ptr,ttmp)
     stats_field(integrator).nf += 1
-    @.. utmp = utmp + β̃1*dt*ke  # utmp now corresponds to y* and x*
+    @.. utmp += β̃1*dt*ke  # utmp now corresponds to y* and x*
     ttmp = t + dt
 
     # if applicable, update p, construct new saddle system here
     err, numiter = init_err, init_iter
     _ode_r1imp!(dutmp,f,utmp,pold_ptr,ttmp)
     @.. u = utmp
-    @.. utmp = utmp + α̃2*dt*ki + α̃1*dt*dutmp
+    @.. utmp += α̃2*dt*ki + α̃1*dt*dutmp
     while err > tol && numiter <= maxiter
       udiff .= u
       param_update_func(pnew_ptr,u,pold_ptr,ttmp)
@@ -740,14 +740,15 @@ function initialize!(integrator,cache::HETrapezoidalAB2ConstantCache)
 end
 
 @muladd function perform_step!(integrator,cache::HETrapezoidalAB2ConstantCache{sc,ni,solverType},repeat_step=false) where {sc,ni,solverType}
-  @unpack t,dt,uprev,f,p,opts,alg = integrator
+  @unpack t,dt,uprev,uprev2,f,p,opts,alg = integrator
   @unpack internalnorm = opts
   @unpack maxiter, tol = alg
+  @unpack α̃1,α̃2,β̃1,β̃2 = cache
   @unpack param_update_func = f
 
   init_err = float(1)
   #init_iter = ni ? 1 : maxiter
-  init_iter = maxiter  # First-order method does not need iteration
+  init_iter = maxiter
 
 
   # set up some cache variables
@@ -755,22 +756,30 @@ end
   ducache = deepcopy(uprev)
   ptmp = deepcopy(p)
   L = _fetch_ode_L(f)
-  Hdt = exp(L,-dt,state(uprev))
+  A = implicit_operator(_fetch_ode_L(f),α̃1*dt)
   pold_ptr = p
   pnew_ptr = ptmp
 
-  k1 = _ode_r1(f,uprev,pold_ptr,t)
+  ke = _ode_r1(f,uprev2,pold_ptr,t-dt) #ke at step n-1
+  ki = _ode_implicit_rhs(f,uprev,pold_ptr,t)
+  uprev2 = uprev
+
+  utmp = uprev + β̃2*dt*ke
+
+  ke = _ode_r1(f,uprev,pold_ptr,t)
   stats_field(integrator).nf += 1
-  @.. k1 *= dt
-  utmp = @.. uprev + k1
+  @.. utmp = utmp + β̃1*dt*ke  # utmp now corresponds to y* and x*
+
+  ducache .= _ode_r1imp(f,utmp,pold_ptr,t+dt)
 
   # if applicable, update p, construct new saddle system here, using Hdt
   err, numiter = init_err, init_iter
   u = deepcopy(utmp)
+  @.. utmp = utmp + α̃2*dt*ki + α̃1*dt*ducache
   while err > tol && numiter <= maxiter
     udiff .= u
     pnew_ptr = param_update_func(u,pold_ptr,t+dt)
-    S = SaddleSystem(Hdt,f,pnew_ptr,pold_ptr,ducache,solverType;cfact=1.0/dt)
+    S = SaddleSystem(A,f,pnew_ptr,pold_ptr,ducache,solverType;cfact=1.0/(α̃1*dt))
     constraint(utmp) .= constraint(_constraint_r2(f,u,pnew_ptr,t+dt))
     mainvector(u) .= S\mainvector(utmp)
     @.. udiff -= u
@@ -779,7 +788,7 @@ end
     #println("error = ",err)
   end
   z = constraint(u)
-  @.. z /= dt
+  @.. z /= (α̃1*dt)
 
   # Final steps
   integrator.p = param_update_func(u,pold_ptr,t)
