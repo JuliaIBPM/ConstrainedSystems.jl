@@ -60,8 +60,9 @@ as a [`SaddleVector`](@ref), e.g. `SaddleSystem(A,B₂,B₁ᵀ,SaddleVector(u,f)
 An optional keyword argument `solver=` can be used to specify the type of
 solution for the Schur complement system. By default, this is set to `Direct`,
 and the Schur complement matrix is formed, factorized, and stored. This can be
-changed to `Iterative`, in which case an iterative solver is determined
-by the `linsolve` function of [`KrylovKit.jl`](https://github.com/Jutho/KrylovKit.jl).
+changed to a variety of iterative solvers, e.g.  `BiCGStabl`, `CG`, `GMRES`, in which case
+ an iterative solver from [`IterativeSolvers.jl`](https://github.com/JuliaLinearAlgebra/IterativeSolvers.jl)
+ is used.
 """
 function SaddleSystem(A::LinearMap{T},B₂::LinearMap{T},B₁ᵀ::LinearMap{T},C::LinearMap{T},
                       A⁻¹::LinearMap{T},P::LinearMap{T},TU,TF;solver::Type{TS}=Direct,kwargs...) where {T,TS<:SchurSolverType}
