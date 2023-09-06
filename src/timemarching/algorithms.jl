@@ -233,16 +233,18 @@ function alg_cache(alg::HETrapezoidalAB2{solverType},u,rate_prototype,uEltypeNoU
 
   S = []
   push!(S,SaddleSystem(A,f,p,p,dutmp,solverType;cfact=1.0/(α̃1*dt)))
+  push!(S,SaddleSystem(A,f,p,p,dutmp,solverType;cfact=1.0/dt))
+
 
   HETrapezoidalAB2Cache{sc,ni,solverType}(u,uprev,ki,ke,utmp,udiff,dutmp,fsalfirst,
                                   A,S,deepcopy(p),k,tab)
 end
 
-function alg_cache(alg::HETrapezoidalAB2Cache{solverType},u,rate_prototype,
+function alg_cache(alg::HETrapezoidalAB2{solverType},u,rate_prototype,
                                   uEltypeNoUnits,uBottomEltypeNoUnits,
                                   tTypeNoUnits,uprev,uprev2,f,t,dt,reltol,
                                   p,calck,::Val{false}) where {solverType}
-  HETrapezoidalAB2CacheConstantCache{isstatic(f),needs_iteration(f,u,p,rate_prototype),solverType}(constvalue(uBottomEltypeNoUnits))
+  HETrapezoidalAB2ConstantCache{isstatic(f),needs_iteration(f,u,p,rate_prototype),solverType}(constvalue(uBottomEltypeNoUnits))
 end
 
 
@@ -656,7 +658,7 @@ end
 #### Half-explicit Trapezoidal/Adams-Bashforth 2 (HETrapezoidalAB2) ####
 
 function initialize!(integrator,cache::HETrapezoidalAB2Cache)
-    @unpack k,fsalfirst = cache
+    @unpack ki,k,fsalfirst = cache
 
     integrator.fsalfirst = fsalfirst
     integrator.fsallast = k
@@ -665,6 +667,7 @@ function initialize!(integrator,cache::HETrapezoidalAB2Cache)
     integrator.k[1] = integrator.fsalfirst
     integrator.k[2] = integrator.fsallast
     integrator.f.odef(integrator.fsalfirst, integrator.uprev, integrator.p, integrator.t) # Pre-start fsal
+    #_ode_implicit_rhs!(ki,integrator.f,integrator.uprev,integrator.p,integrator.t)
     integrator.f.param_update_func(integrator.p,integrator.uprev,integrator.p,integrator.t)
     stats_field(integrator).nf += 1
 
@@ -681,6 +684,7 @@ end
     init_err = float(1)
     #init_iter = ni ? 1 : maxiter
     init_iter = maxiter
+    cnt = integrator.iter
 
     # aliases to the state and constraint parts
     ytmp, ztmp = state(utmp), constraint(utmp)
@@ -691,11 +695,36 @@ end
     ttmp = t
     u .= uprev
 
-    @.. utmp = uprev + β̃2*dt*ke
 
-    _ode_r1!(ke,f,utmp,pold_ptr,ttmp)
-    stats_field(integrator).nf += 1
-    @.. utmp += β̃1*dt*ke  # utmp now corresponds to y* and x*
+    if cnt == 1
+      # Use Euler step to replace AB2, but still use trapezoidal for implicit part
+
+      @.. utmp = uprev
+
+      # If C is not empty, then find the initial constraint to go along
+      # with the initial state
+      if !_isempty(S[1].C)
+        _constraint_r2!(utmp,f,utmp,pold_ptr,ttmp)
+        constraint_from_state!(mainvector(utmp),S[1],mainvector(utmp))
+        @.. ztmp /= (α̃1*dt)
+      end
+
+      # Calculate the initial ki (time level 0)
+      _ode_implicit_rhs!(ki,f,utmp,pold_ptr,ttmp)
+
+      _ode_r1!(ke,f,utmp,pold_ptr,ttmp)
+      stats_field(integrator).nf += 1
+      @.. utmp += dt*ke
+
+
+    else
+      @.. utmp = uprev + β̃2*dt*ke
+
+      _ode_r1!(ke,f,utmp,pold_ptr,ttmp)
+      stats_field(integrator).nf += 1
+      @.. utmp += β̃1*dt*ke  # utmp now corresponds to y* and x*
+
+    end
     ttmp = t + dt
 
     # if applicable, update p, construct new saddle system here
@@ -706,7 +735,7 @@ end
     while err > tol && numiter <= maxiter
       udiff .= u
       param_update_func(pnew_ptr,u,pold_ptr,ttmp)
-      S[1] = SaddleSystem(S[1],A,f,pnew_ptr,pold_ptr,cache)
+      S[1] = SaddleSystem(S[1],A,f,pnew_ptr,pnew_ptr,cache)
       _constraint_r2!(utmp,f,u,pnew_ptr,t+dt)
       mainvector(u) .= S[1]\mainvector(utmp)
       @.. udiff -= u
@@ -714,6 +743,7 @@ end
       err = internalnorm(udiff,ttmp)
       #println("numiter = ",numiter, ", error = ",err)
     end
+
     @.. z /= (α̃1*dt)
 
     # Final steps
@@ -749,7 +779,7 @@ end
   init_err = float(1)
   #init_iter = ni ? 1 : maxiter
   init_iter = maxiter
-
+  cnt = integrator.iter
 
   # set up some cache variables
   udiff = deepcopy(uprev)
@@ -760,15 +790,34 @@ end
   pold_ptr = p
   pnew_ptr = ptmp
 
-  ke = _ode_r1(f,uprev2,pold_ptr,t-dt) #ke at step n-1
-  ki = _ode_implicit_rhs(f,uprev,pold_ptr,t)
-  uprev2 = uprev
+  if cnt == 1
+    utmp = uprev
+    S = SaddleSystem(A,f,pold_ptr,pold_ptr,ducache,solverType;cfact=1.0/(α̃1*dt))
+    if !_isempty(S.C)
+      constraint(utmp) .= constraint(_constraint_r2(f,utmp,pold_ptr,t))
+      constraint_from_state!(mainvector(utmp),S,mainvector(utmp))
+      ztmp = constraint(utmp)
+      @.. ztmp /= (α̃1*dt)
+    end
 
-  utmp = uprev + β̃2*dt*ke
+    # Calculate the initial ki (time level 0)
+    ki = _ode_implicit_rhs(f,utmp,pold_ptr,t)
+    ke = _ode_r1(f,uprev,pold_ptr,t)
+    stats_field(integrator).nf += 1
+    @.. utmp = utmp + dt*ke
 
-  ke = _ode_r1(f,uprev,pold_ptr,t)
-  stats_field(integrator).nf += 1
-  @.. utmp = utmp + β̃1*dt*ke  # utmp now corresponds to y* and x*
+  else
+    ke = _ode_r1(f,uprev2,pold_ptr,t-dt) #ke at step n-1
+    ki = _ode_implicit_rhs(f,uprev,pold_ptr,t)
+    uprev2 = uprev
+
+    utmp = uprev + β̃2*dt*ke
+
+    ke = _ode_r1(f,uprev,pold_ptr,t)
+    stats_field(integrator).nf += 1
+    @.. utmp = utmp + β̃1*dt*ke  # utmp now corresponds to y* and x*
+
+  end
 
   ducache .= _ode_r1imp(f,utmp,pold_ptr,t+dt)
 
@@ -779,7 +828,7 @@ end
   while err > tol && numiter <= maxiter
     udiff .= u
     pnew_ptr = param_update_func(u,pold_ptr,t+dt)
-    S = SaddleSystem(A,f,pnew_ptr,pold_ptr,ducache,solverType;cfact=1.0/(α̃1*dt))
+    S = SaddleSystem(A,f,pnew_ptr,pnew_ptr,ducache,solverType;cfact=1.0/(α̃1*dt))
     constraint(utmp) .= constraint(_constraint_r2(f,u,pnew_ptr,t+dt))
     mainvector(u) .= S\mainvector(utmp)
     @.. udiff -= u
@@ -787,6 +836,7 @@ end
     err = internalnorm(udiff,t+dt)
     #println("error = ",err)
   end
+
   z = constraint(u)
   @.. z /= (α̃1*dt)
 

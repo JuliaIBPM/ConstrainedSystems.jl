@@ -166,6 +166,7 @@ function constraint_from_state!(sol::Union{Tuple{AbstractVector{T},AbstractVecto
     _isempty(C) && error("C operator cannot be inverted")
 
     f .= C⁻¹*(r₂ .- B₂*u)
+
     return sol
 
 end

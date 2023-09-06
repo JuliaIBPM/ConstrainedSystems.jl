@@ -1,5 +1,7 @@
 ### SaddleSystem ###
 
+using IterativeSolvers
+
 abstract type SchurSolverType end
 
 struct SaddleSystem{T,Ns,Nc,TU,TF,TS<:SchurSolverType}
@@ -84,12 +86,14 @@ function _inverse_function(S::LinearMap{T},::Type{Direct},kwargs...) where {T}
   return LinearMap{T}(x -> Sfact\x,M)
 end
 
+#=
 abstract type Iterative <: SchurSolverType end
 
 function _inverse_function(S::LinearMap{T},::Type{Iterative},kwargs...) where {T}
   M, N = size(S)
   return LinearMap{T}(x -> (prob = LinearProblem(S,x); sol = solve(prob); sol.u) ,M)
 end
+=#
 
 macro createsolver(stype)
   sroutine = Symbol(lowercase(string(stype)),"!")
@@ -97,7 +101,8 @@ macro createsolver(stype)
   return esc(quote
           export $stype
           abstract type $stype <: SchurSolverType end
-          function _inverse_function(S,T,M,::Type{$stype},kwargs...)
+          function _inverse_function(S::LinearMap{T},::Type{$stype},kwargs...) where {T}
+            M, N = size(S)
             return LinearMap{T}(x -> (y = deepcopy(x); $sroutine(y,S,x;kwargs...); return y),M)
           end
         end)

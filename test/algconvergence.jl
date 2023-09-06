@@ -95,12 +95,18 @@ prob, xexact, yexact = ConstrainedSystems.basic_constrained_if_problem_with_cmat
 
 solutions1 = [solve(prob,LiskaIFHERK();dt=dts[i]) for i=1:length(dts)]
 solutions2 = [solve(prob,IFHEEuler();dt=dts[i]) for i=1:length(dts)]
+solutions3 = [solve(prob,HETrapezoidalAB2();dt=dts[i]) for i=1:length(dts)]
+
 
 𝒪est1 = compute𝒪est(solutions1,1,xexact)
 𝒪est2 = compute𝒪est(solutions2,1,xexact)
+𝒪est3 = compute𝒪est(solutions3,1,xexact)
+
 
 @test 𝒪est1[:l2][1] ≈ 1 atol=testTol # IFHERK only 1st order convergent on this problem
 @test 𝒪est2[:l2][1] ≈ 1 atol=testTol
+@test 𝒪est3[:l2][1] ≈ 2 atol=testTol
+
 
 ### out of place ###
 
@@ -173,11 +179,17 @@ prob, xexact, yexact = ConstrainedSystems.basic_constrained_if_problem_with_cmat
 
 solutions1 = [solve(prob,LiskaIFHERK();dt=dts[i]) for i=1:length(dts)]
 solutions2 = [solve(prob,IFHEEuler();dt=dts[i]) for i=1:length(dts)]
+solutions3 = [solve(prob,HETrapezoidalAB2();dt=dts[i]) for i=1:length(dts)]
+
 
 𝒪est1 = compute𝒪est(solutions1,1,xexact)
 𝒪est2 = compute𝒪est(solutions2,1,xexact)
+𝒪est3 = compute𝒪est(solutions3,1,xexact)
+
 
 @test 𝒪est1[:l2][1] ≈ 1 atol=testTol # IFHERK only 1st order convergent on this problem
 @test 𝒪est2[:l2][1] ≈ 1 atol=testTol
+@test 𝒪est3[:l2][1] ≈ 2 atol=testTol
+
 
 end

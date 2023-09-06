@@ -347,7 +347,7 @@ function basic_constrained_if_problem_with_cmatrix(;tmax=1.0,iip=true)
   r2 = 1.0
   p = [α,B1T,B2,β,r2]
 
-  L = α*I
+  L = α*I(1)
 
   ode_rhs!(dy,y,x,p,t) = fill!(dy,0.0)
   ode_rhs(y,x,p,t) = zero(y)
