@@ -41,6 +41,8 @@ exp(L::AbstractMatrix,t,x) = exp(factorize(L)*t)
 exp(L::UniformScaling,t,x) = exp(Diagonal(L,length(x))*t)
 
 implicit_operator(L::AbstractMatrix,a::Real) = I - a*L
+implicit_operator(L::UniformScaling,a::Real) = I - a*L
+
 implicit_operator(f::DiffEqLinearOperator,args...) = implicit_operator(f.L,args...)
 implicit_operator(f::ODEFunction,args...) = implicit_operator(f.f,args...)
 

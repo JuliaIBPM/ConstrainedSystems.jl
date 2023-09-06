@@ -33,12 +33,18 @@ prob, xexact = ConstrainedSystems.basic_unconstrained_problem(iip=true)
 # state from constraint in sol structure
 solutions1 = [solve(prob,LiskaIFHERK();dt=dts[i]) for i=1:length(dts)]
 solutions2 = [solve(prob,IFHEEuler();dt=dts[i]) for i=1:length(dts)]
+solutions3 = [solve(prob,HETrapezoidalAB2();dt=dts[i]) for i=1:length(dts)]
+
 
 𝒪est1 = compute𝒪est(solutions1,1,xexact)
 𝒪est2 = compute𝒪est(solutions2,1,xexact)
+𝒪est3 = compute𝒪est(solutions3,1,xexact)
+
 
 @test 𝒪est1[:l2][1] ≈ 3 atol=testTol
 @test 𝒪est2[:l2][1] ≈ 1 atol=testTol
+@test 𝒪est3[:l2][1] ≈ 2 atol=testTol
+
 
 # Unconstrained problem with only an integrating factor. Should achieve machine
 # precision
@@ -48,11 +54,18 @@ prob, xexact = ConstrainedSystems.basic_unconstrained_if_problem(iip=true)
 # state from constraint in sol structure
 solutions1 = [solve(prob,LiskaIFHERK();dt=dts[i]) for i=1:length(dts)]
 solutions2 = [solve(prob,IFHEEuler();dt=dts[i]) for i=1:length(dts)]
+solutions3 = [solve(prob,HETrapezoidalAB2();dt=dts[i]) for i=1:length(dts)]
+
 
 error1 = compute_error(solutions1,1,xexact)
 error2 = compute_error(solutions2,1,xexact)
+𝒪est3 = compute𝒪est(solutions3,1,xexact)
+
+# IF methods should be exact
 @test all(error1[:l2] .< TOL)
 @test all(error2[:l2] .< TOL)
+@test 𝒪est3[:l2][1] ≈ 2 atol=testTol
+
 
 
 # Constrained
@@ -62,34 +75,50 @@ prob, xexact, yexact = ConstrainedSystems.basic_constrained_problem(iip=true)
 # state from constraint in sol structure
 solutions1 = [solve(prob,LiskaIFHERK();dt=dts[i]) for i=1:length(dts)]
 solutions2 = [solve(prob,IFHEEuler();dt=dts[i]) for i=1:length(dts)]
+solutions3 = [solve(prob,HETrapezoidalAB2();dt=dts[i]) for i=1:length(dts)]
+
 
 𝒪est1 = compute𝒪est(solutions1,1,xexact)
 𝒪est2 = compute𝒪est(solutions2,1,xexact)
+𝒪est3 = compute𝒪est(solutions3,1,xexact)
+
 
 @test 𝒪est1[:l2][1] ≈ 2 atol=testTol
 @test 𝒪est2[:l2][1] ≈ 1 atol=testTol
+@test 𝒪est3[:l2][1] ≈ 2 atol=testTol
+
 
 prob, xexact, yexact = ConstrainedSystems.cartesian_pendulum_problem(iip=true)
 
 solutions1 = [solve(prob,LiskaIFHERK();dt=dts[i]) for i=1:length(dts)]
 solutions2 = [solve(prob,IFHEEuler();dt=dts[i]) for i=1:length(dts)]
+solutions3 = [solve(prob,HETrapezoidalAB2();dt=dts[i]) for i=1:length(dts)]
 
 𝒪est1 = compute𝒪est(solutions1,1,xexact)
 𝒪est2 = compute𝒪est(solutions2,1,xexact)
+𝒪est3 = compute𝒪est(solutions3,1,xexact)
+
 
 @test 𝒪est1[:l2][1] ≈ 2 atol=testTol
 @test 𝒪est2[:l2][1] ≈ 1 atol=testTol
+@test 𝒪est3[:l2][1] ≈ 2 atol=testTol
+
 
 prob, xexact, yexact = ConstrainedSystems.partitioned_problem(iip=true)
 
 solutions1 = [solve(prob,LiskaIFHERK();dt=dts[i]) for i=1:length(dts)]
 solutions2 = [solve(prob,IFHEEuler();dt=dts[i]) for i=1:length(dts)]
+solutions3 = [solve(prob,HETrapezoidalAB2();dt=dts[i]) for i=1:length(dts)]
 
 𝒪est1 = compute𝒪est(solutions1,1,xexact)
 𝒪est2 = compute𝒪est(solutions2,1,xexact)
+𝒪est3 = compute𝒪est(solutions3,1,xexact)
+
 
 @test 𝒪est1[:l2][1] ≈ 2 atol=testTol
 @test 𝒪est2[:l2][1] ≈ 1 atol=testTol
+@test 𝒪est3[:l2][1] ≈ 2 atol=testTol
+
 
 prob, xexact, yexact = ConstrainedSystems.basic_constrained_if_problem_with_cmatrix(iip=true)
 
@@ -117,12 +146,17 @@ prob, xexact = ConstrainedSystems.basic_unconstrained_problem(iip=false)
 # state from constraint in sol structure
 solutions1 = [solve(prob,LiskaIFHERK();dt=dts[i]) for i=1:length(dts)]
 solutions2 = [solve(prob,IFHEEuler();dt=dts[i]) for i=1:length(dts)]
+solutions3 = [solve(prob,HETrapezoidalAB2();dt=dts[i]) for i=1:length(dts)]
 
 𝒪est1 = compute𝒪est(solutions1,1,xexact)
 𝒪est2 = compute𝒪est(solutions2,1,xexact)
+𝒪est3 = compute𝒪est(solutions3,1,xexact)
+
 
 @test 𝒪est1[:l2][1] ≈ 3 atol=testTol
 @test 𝒪est2[:l2][1] ≈ 1 atol=testTol
+@test 𝒪est3[:l2][1] ≈ 2 atol=testTol
+
 
 # Unconstrained problem with only an integrating factor. Should achieve machine
 # precision
@@ -132,12 +166,17 @@ prob, xexact = ConstrainedSystems.basic_unconstrained_if_problem(iip=false)
 # state from constraint in sol structure
 solutions1 = [solve(prob,LiskaIFHERK();dt=dts[i]) for i=1:length(dts)]
 solutions2 = [solve(prob,IFHEEuler();dt=dts[i]) for i=1:length(dts)]
+solutions3 = [solve(prob,HETrapezoidalAB2();dt=dts[i]) for i=1:length(dts)]
+
 
 error1 = compute_error(solutions1,1,xexact)
 error2 = compute_error(solutions2,1,xexact)
+𝒪est3 = compute𝒪est(solutions3,1,xexact)
 
+# IF methods should be exact
 @test all(error1[:l2] .< TOL)
 @test all(error2[:l2] .< TOL)
+@test 𝒪est3[:l2][1] ≈ 2 atol=testTol
 
 
 # Constrained
@@ -146,34 +185,50 @@ prob, xexact, yexact = ConstrainedSystems.basic_constrained_problem(iip=false)
 
 solutions1 = [solve(prob,LiskaIFHERK();dt=dts[i]) for i=1:length(dts)]
 solutions2 = [solve(prob,IFHEEuler();dt=dts[i]) for i=1:length(dts)]
+solutions3 = [solve(prob,HETrapezoidalAB2();dt=dts[i]) for i=1:length(dts)]
+
 
 𝒪est1 = compute𝒪est(solutions1,1,xexact)
 𝒪est2 = compute𝒪est(solutions2,1,xexact)
+𝒪est3 = compute𝒪est(solutions3,1,xexact)
+
 
 @test 𝒪est1[:l2][1] ≈ 2 atol=testTol
 @test 𝒪est2[:l2][1] ≈ 1 atol=testTol
+@test 𝒪est3[:l2][1] ≈ 2 atol=testTol
+
 
 prob, xexact, yexact = ConstrainedSystems.cartesian_pendulum_problem(iip=false)
 
 solutions1 = [solve(prob,LiskaIFHERK();dt=dts[i]) for i=1:length(dts)]
 solutions2 = [solve(prob,IFHEEuler();dt=dts[i]) for i=1:length(dts)]
+solutions3 = [solve(prob,HETrapezoidalAB2();dt=dts[i]) for i=1:length(dts)]
+
 
 𝒪est1 = compute𝒪est(solutions1,1,xexact)
 𝒪est2 = compute𝒪est(solutions2,1,xexact)
+𝒪est3 = compute𝒪est(solutions3,1,xexact)
+
 
 @test 𝒪est1[:l2][1] ≈ 2 atol=testTol
 @test 𝒪est2[:l2][1] ≈ 1 atol=testTol
+@test 𝒪est3[:l2][1] ≈ 2 atol=testTol
+
 
 prob, xexact, yexact = ConstrainedSystems.partitioned_problem(iip=false)
 
 solutions1 = [solve(prob,LiskaIFHERK();dt=dts[i]) for i=1:length(dts)]
 solutions2 = [solve(prob,IFHEEuler();dt=dts[i]) for i=1:length(dts)]
+solutions3 = [solve(prob,HETrapezoidalAB2();dt=dts[i]) for i=1:length(dts)]
 
 𝒪est1 = compute𝒪est(solutions1,1,xexact)
 𝒪est2 = compute𝒪est(solutions2,1,xexact)
+𝒪est3 = compute𝒪est(solutions3,1,xexact)
 
 @test 𝒪est1[:l2][1] ≈ 2 atol=testTol
 @test 𝒪est2[:l2][1] ≈ 1 atol=testTol
+@test 𝒪est3[:l2][1] ≈ 2 atol=testTol
+
 
 prob, xexact, yexact = ConstrainedSystems.basic_constrained_if_problem_with_cmatrix(iip=false)
 

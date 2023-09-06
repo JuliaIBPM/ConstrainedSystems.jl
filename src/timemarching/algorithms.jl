@@ -703,7 +703,7 @@ end
 
       # If C is not empty, then find the initial constraint to go along
       # with the initial state
-      if !_isempty(S[1].C)
+      if _isinvertible(S[1].C)
         _constraint_r2!(utmp,f,utmp,pold_ptr,ttmp)
         constraint_from_state!(mainvector(utmp),S[1],mainvector(utmp))
         @.. ztmp /= (α̃1*dt)
@@ -712,6 +712,7 @@ end
       # Calculate the initial ki (time level 0)
       _ode_implicit_rhs!(ki,f,utmp,pold_ptr,ttmp)
 
+      # Calculate the initial ke (time level 0)
       _ode_r1!(ke,f,utmp,pold_ptr,ttmp)
       stats_field(integrator).nf += 1
       @.. utmp += dt*ke
@@ -720,7 +721,7 @@ end
     else
       @.. utmp = uprev + β̃2*dt*ke
 
-      _ode_r1!(ke,f,utmp,pold_ptr,ttmp)
+      _ode_r1!(ke,f,uprev,pold_ptr,ttmp)
       stats_field(integrator).nf += 1
       @.. utmp += β̃1*dt*ke  # utmp now corresponds to y* and x*
 
@@ -793,7 +794,7 @@ end
   if cnt == 1
     utmp = uprev
     S = SaddleSystem(A,f,pold_ptr,pold_ptr,ducache,solverType;cfact=1.0/(α̃1*dt))
-    if !_isempty(S.C)
+    if _isinvertible(S.C)
       constraint(utmp) .= constraint(_constraint_r2(f,utmp,pold_ptr,t))
       constraint_from_state!(mainvector(utmp),S,mainvector(utmp))
       ztmp = constraint(utmp)
@@ -809,7 +810,6 @@ end
   else
     ke = _ode_r1(f,uprev2,pold_ptr,t-dt) #ke at step n-1
     ki = _ode_implicit_rhs(f,uprev,pold_ptr,t)
-    uprev2 = uprev
 
     utmp = uprev + β̃2*dt*ke
 
@@ -818,6 +818,8 @@ end
     @.. utmp = utmp + β̃1*dt*ke  # utmp now corresponds to y* and x*
 
   end
+  @.. uprev2 = uprev
+
 
   ducache .= _ode_r1imp(f,utmp,pold_ptr,t+dt)
 

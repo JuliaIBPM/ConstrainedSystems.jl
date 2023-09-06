@@ -199,8 +199,12 @@ eltype(::SaddleSystem{T,Ns,Nc}) where {T,Ns,Nc} = T
 
 C_zero(f,eltype) = zeros(eltype,length(f),length(f))
 
-_isempty(f::LinearMap) = iszero(f.lmap)
-_isempty(f::FunctionMap) = length(f) == 0
+_isinvertible(f::LinearMap) = !iszero(f.lmap)
+function _isinvertible(f::FunctionMap{T}) where {T}
+  length(f) == 0 && return false
+  M, N = size(f)
+  return !iszero(f*rand(T,N))
+end
 
 
 function _check_sizes(A,B₂,B₁ᵀ,C,P)

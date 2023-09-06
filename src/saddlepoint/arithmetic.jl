@@ -163,7 +163,7 @@ function constraint_from_state!(sol::Union{Tuple{AbstractVector{T},AbstractVecto
     r₁,r₂ = rhs
     length(u) == length(r₁) == Ns || error("Incompatible number of elements")
     length(f) == length(r₂) == Nc || error("Incompatible number of elements")
-    _isempty(C) && error("C operator cannot be inverted")
+    _isinvertible(C) || error("C operator cannot be inverted")
 
     f .= C⁻¹*(r₂ .- B₂*u)
 
