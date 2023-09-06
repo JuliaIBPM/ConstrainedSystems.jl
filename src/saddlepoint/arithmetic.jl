@@ -154,5 +154,38 @@ function (\)(sys::Tuple{T1,T2},rhs) where {T1<:SaddleSystem,T2<:SaddleSystem}
     return sol
 end
 
+# For getting the constraint part from the state part, when there is a C matrix
+function constraint_from_state!(sol::Union{Tuple{AbstractVector{T},AbstractVector{T}},AbstractVectorOfArray{T}},sys::SaddleSystem{T,Ns,Nc},
+              rhs::Union{Tuple{AbstractVector{T},AbstractVector{T}},AbstractVectorOfArray{T}}) where {T,Ns,Nc}
+
+    @unpack B₂, C, C⁻¹ = sys
+    u,f = sol
+    r₁,r₂ = rhs
+    length(u) == length(r₁) == Ns || error("Incompatible number of elements")
+    length(f) == length(r₂) == Nc || error("Incompatible number of elements")
+    _isempty(C) && error("C operator cannot be inverted")
+
+    f .= C⁻¹*(r₂ .- B₂*u)
+    return sol
+
+end
+
+function constraint_from_state!(sol::Tuple{TU,TF},sys::SaddleSystem,rhs::Tuple{TU,TF}) where {TU,TF}
+    u, f = sol
+    r₁, r₂ = rhs
+    return constraint_from_state!((_unwrap_vec(u),_unwrap_vec(f)),sys,(_unwrap_vec(r₁),_unwrap_vec(r₂)))
+end
+
+function constraint_from_state!(sol::ArrayPartition,sys::SaddleSystem,rhs::ArrayPartition)
+    u, f = sol.x
+    r₁, r₂ = rhs.x
+    return constraint_from_state!((_unwrap_vec(u),_unwrap_vec(f)),sys,(_unwrap_vec(r₁),_unwrap_vec(r₂)))
+end
+
+function constraint_from_state!(sol::AbstractVector{T},sys::SaddleSystem{T,Ns,Nc},rhs::AbstractVector{T}) where {T,Ns,Nc}
+    constraint_from_state!(_split_vector(sol,Ns,Nc),sys,_split_vector(rhs,Ns,Nc))
+    return sol
+end
+
 # vector -> tuple
 _split_vector(x,Ns,Nc) = view(x,1:Ns), view(x,Ns+1:Ns+Nc)

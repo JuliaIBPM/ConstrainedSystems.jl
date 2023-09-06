@@ -29,6 +29,7 @@ import LinearAlgebra: ldiv!, mul!, *, \, I
 import Base: size, eltype, *, /, +, -
 
 export SaddleSystem, SaddleVector, state, constraint, aux_state, linear_map
+export constraint_from_state!
 export solvector, mainvector
 export SchurSolverType, Direct, CG, GMRES, Iterative
 
