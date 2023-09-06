@@ -24,6 +24,11 @@
     @test norm((A*sol2)[1]-rhs[1]) < 1e-14
     @test norm((A*sol2)[2]-rhs[2]) < 1e-14
 
+    sol3 = deepcopy(sol)
+    sol3[2] .= 0.0
+    constraint_from_state!(sol3,A,rhs)
+    @test sol2[1] ≈ sol3[1] && sol2[2] ≈ sol3[2]
+
     # test inputs and outputs as vectors
     rhs1, rhs2 = rhs
     rhsvec = [rhs1;rhs2]
@@ -32,6 +37,12 @@
     solvec = A\rhsvec
 
     @test norm(A*solvec-rhsvec) < 1e-14
+
+    solvec2 = deepcopy(solvec)
+    solvec2[3:4] .= 0.0
+    constraint_from_state!(solvec2,A,rhsvec)
+    @test solvec2 ≈ solvec
+
 
     # test with the other constructor
     Aother = SaddleSystem(A1,B2,B1,C,zeros(Float64,2),zeros(Float64,2))
@@ -182,6 +193,9 @@
     @test ψ[nx,65] ≈ -ψ[1,65]
     @test ψ[65,ny] ≈ ψ[65,1]
 
+    sol3 = deepcopy(sol2)
+    constraint(sol3) .= 0.0
+    @test_throws ErrorException constraint_from_state!(sol3,A,rhs)
 
   end
 

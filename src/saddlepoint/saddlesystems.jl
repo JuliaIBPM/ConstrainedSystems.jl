@@ -1,5 +1,7 @@
 ### SaddleSystem ###
 
+using IterativeSolvers
+
 abstract type SchurSolverType end
 
 struct SaddleSystem{T,Ns,Nc,TU,TF,TS<:SchurSolverType}
@@ -8,6 +10,7 @@ struct SaddleSystem{T,Ns,Nc,TU,TF,TS<:SchurSolverType}
     B₁ᵀ :: LinearMap{T}
     C :: LinearMap{T}
     A⁻¹ :: LinearMap{T}
+    C⁻¹ :: LinearMap{T}
     A⁻¹B₁ᵀf :: Vector{T}
     B₂A⁻¹r₁ :: Vector{T}
     _f_buf :: Vector{T}
@@ -67,26 +70,30 @@ function SaddleSystem(A::LinearMap{T},B₂::LinearMap{T},B₁ᵀ::LinearMap{T},C
 
     S = C - B₂*A⁻¹*B₁ᵀ
 
-    S⁻¹ = _schur_inverse_function(S,T,nc,solver,kwargs...)
+    S⁻¹ = _inverse_function(S,solver,kwargs...)
+    C⁻¹ = _inverse_function(C,solver,kwargs...)
 
-    return SaddleSystem{T,ns,nc,TU,TF,solver}(A,B₂,B₁ᵀ,C,A⁻¹,zeros(T,ns),zeros(T,nc),zeros(T,nc),P,S,S⁻¹)
+    return SaddleSystem{T,ns,nc,TU,TF,solver}(A,B₂,B₁ᵀ,C,A⁻¹,C⁻¹,zeros(T,ns),zeros(T,nc),zeros(T,nc),P,S,S⁻¹)
 end
 
-##### Schur complement solver functions #####
+##### Solver functions #####
 
 abstract type Direct <: SchurSolverType end
 
-function _schur_inverse_function(S,T,M,::Type{Direct},kwargs...)
+function _inverse_function(S::LinearMap{T},::Type{Direct},kwargs...) where {T}
   Sfact = factorize(Matrix(S))
+  M, N = size(S)
   return LinearMap{T}(x -> Sfact\x,M)
 end
 
+#=
 abstract type Iterative <: SchurSolverType end
 
-function _schur_inverse_function(S,T,M,::Type{Iterative},kwargs...)
-
+function _inverse_function(S::LinearMap{T},::Type{Iterative},kwargs...) where {T}
+  M, N = size(S)
   return LinearMap{T}(x -> (prob = LinearProblem(S,x); sol = solve(prob); sol.u) ,M)
 end
+=#
 
 macro createsolver(stype)
   sroutine = Symbol(lowercase(string(stype)),"!")
@@ -94,7 +101,8 @@ macro createsolver(stype)
   return esc(quote
           export $stype
           abstract type $stype <: SchurSolverType end
-          function _schur_inverse_function(S,T,M,::Type{$stype},kwargs...)
+          function _inverse_function(S::LinearMap{T},::Type{$stype},kwargs...) where {T}
+            M, N = size(S)
             return LinearMap{T}(x -> (y = deepcopy(x); $sroutine(y,S,x;kwargs...); return y),M)
           end
         end)
@@ -190,6 +198,14 @@ Report the element type of a [`SaddleSystem`](@ref).
 eltype(::SaddleSystem{T,Ns,Nc}) where {T,Ns,Nc} = T
 
 C_zero(f,eltype) = zeros(eltype,length(f),length(f))
+
+_isinvertible(f::LinearMap) = !iszero(f.lmap)
+function _isinvertible(f::FunctionMap{T}) where {T}
+  length(f) == 0 && return false
+  M, N = size(f)
+  return !iszero(f*rand(T,N))
+end
+
 
 function _check_sizes(A,B₂,B₁ᵀ,C,P)
     mA, nA = size(A)

@@ -40,6 +40,13 @@ has_exp(::DiffEqLinearOperator) = true
 exp(L::AbstractMatrix,t,x) = exp(factorize(L)*t)
 exp(L::UniformScaling,t,x) = exp(Diagonal(L,length(x))*t)
 
+implicit_operator(L::AbstractMatrix,a::Real) = I - a*L
+implicit_operator(L::UniformScaling,a::Real) = I - a*L
+
+implicit_operator(f::DiffEqLinearOperator,args...) = implicit_operator(f.L,args...)
+implicit_operator(f::ODEFunction,args...) = implicit_operator(f.f,args...)
+
+
 #=
 ConstrainedODEFunction
 
@@ -126,6 +133,7 @@ struct ConstrainedODEFunction{iip,static,F1,F2,TMM,C,Ta,Tt,TJ,JVP,VJP,JP,SP,TW,T
 end
 
 function ConstrainedODEFunction(r1,r2,B1,B2,L=DiffEqLinearOperator(0*I),C=nothing;
+                                                 r1imp=nothing,
                                                  param_update_func = DEFAULT_PARAM_UPDATE_FUNC,
                                                  mass_matrix=I,_func_cache=nothing,
                                                  analytic=nothing,
@@ -146,8 +154,8 @@ function ConstrainedODEFunction(r1,r2,B1,B2,L=DiffEqLinearOperator(0*I),C=nothin
     allempty(r2,B1,B2) || noneempty(r2,B1,B2) || error("Inconsistent null operators")
     unconstrained = allempty(r2,B1,B2)
 
-    allinplace(r1,r2,B1,B2) || alloutofplace(r1,r2,B1,B2) || error("Inconsistent function signatures")
-    iip = allinplace(r1,r2,B1,B2)
+    allinplace(r1,r2,B1,B2,r1imp) || alloutofplace(r1,r2,B1,B2,r1imp) || error("Inconsistent function signatures")
+    iip = allinplace(r1,r2,B1,B2,r1imp)
 
     static = param_update_func == DEFAULT_PARAM_UPDATE_FUNC ? true : false
 
@@ -157,9 +165,10 @@ function ConstrainedODEFunction(r1,r2,B1,B2,L=DiffEqLinearOperator(0*I),C=nothin
     local_cache = deepcopy(_func_cache)
     zero_vec!(local_cache)
 
-    odef_nl = SplitFunction(_complete_r1(r1,Val(iip),_func_cache=local_cache),
-                            _complete_B1(B1,Val(iip));_func_cache=deepcopy(local_cache))
-    odef = SplitFunction(L_local, odef_nl ;_func_cache=deepcopy(local_cache))
+    odef_imp_nl = SplitFunction(_complete_B1(B1,Val(iip)),
+                             _complete_r1imp(r1imp,Val(iip));_func_cache=deepcopy(local_cache))
+    odef_imp = SplitFunction(L_local,odef_imp_nl;_func_cache=deepcopy(local_cache))
+    odef = SplitFunction(_complete_r1(r1,Val(iip),_func_cache=local_cache), odef_imp ;_func_cache=deepcopy(local_cache))
     conf_lhs = SplitFunction(_complete_B2(B2,Val(iip)),_complete_C(C,Val(iip));_func_cache=deepcopy(local_cache))
     conf = SplitFunction(_complete_r2(r2,Val(iip)),conf_lhs;_func_cache=deepcopy(local_cache))
 
@@ -185,19 +194,37 @@ function Base.show(io::IO, m::MIME"text/plain",f::ConstrainedODEFunction{iip,sta
 end
 
 # Here is where we define the structure of the function
-@inline _fetch_ode_L(f::ConstrainedODEFunction) = f.odef.f1
-@inline _fetch_ode_r1(f::ConstrainedODEFunction) = f.odef.f2.f.f1
-@inline _fetch_ode_neg_B1(f::ConstrainedODEFunction) = f.odef.f2.f.f2
+@inline _fetch_ode_r1(f::ConstrainedODEFunction) = f.odef.f1
+@inline _fetch_ode_implicit_rhs(f::ConstrainedODEFunction) = f.odef.f2
+@inline _fetch_ode_L(f::ConstrainedODEFunction) = _fetch_ode_implicit_rhs(f).f.f1
+@inline _fetch_ode_neg_B1(f::ConstrainedODEFunction) = _fetch_ode_implicit_rhs(f).f.f2.f.f1
+@inline _fetch_ode_r1imp(f::ConstrainedODEFunction) = _fetch_ode_implicit_rhs(f).f.f2.f.f2
+
 @inline _fetch_constraint_r2(f::ConstrainedODEFunction) = f.conf.f1
 @inline _fetch_constraint_neg_B2(f::ConstrainedODEFunction) = f.conf.f2.f.f1
 @inline _fetch_constraint_neg_C(f::ConstrainedODEFunction) = f.conf.f2.f.f2
 
 
-for fcn in (:_ode_L,:_ode_r1,:_ode_neg_B1,:_constraint_neg_B2,:_constraint_neg_C,:_constraint_r2)
+for fcn in (:_ode_L,:_ode_r1,:_ode_r1imp,:_ode_neg_B1,:_constraint_neg_B2,:_constraint_neg_C,:_constraint_r2,:_ode_implicit_rhs)
   fetchfcn = Symbol("_fetch",string(fcn))
   iipfcn = Symbol(string(fcn),"!")
   @eval $iipfcn(du,f::ConstrainedODEFunction,u,p,t) = $fetchfcn(f)(du,u,p,t)
   @eval $fcn(f::ConstrainedODEFunction,u,p,t) = $fetchfcn(f)(u,p,t)
+end
+
+function _ode_full_rhs!(du,f::ConstrainedODEFunction,u,p,t)
+  @unpack odef = f
+  @unpack cache = odef
+  zero_vec!(cache)
+  zero_vec!(du)
+  _ode_r1!(cache,f,u,p,t)
+  _ode_r1imp!(du,f,u,p,t)
+  du .+= cache
+  return du
+end
+
+function _ode_full_rhs(f::ConstrainedODEFunction,u,p,t)
+  return _ode_r1(f,u,p,t) + _ode_r1imp(f,u,p,t)
 end
 
 allempty(::Nothing,::Nothing,::Nothing) = true
@@ -208,12 +235,19 @@ noneempty(r2,B1,B2) = !(isnothing(r2) || isnothing(B1) || isnothing(B2))
 allinplace(r1,r2,B1,B2) = _isinplace_r1(r1) && _isinplace_r2(r2) && _isinplace_B1(B1) && _isinplace_B2(B2)
 alloutofplace(r1,r2,B1,B2) = _isoop_r1(r1) && _isoop_r2(r2) && _isoop_B1(B1) && _isoop_B2(B2)
 
+allinplace(r1,r2,B1,B2,r1imp) = allinplace(r1,r2,B1,B2) && _isinplace_r1imp(r1imp)
+allinplace(r1,r2,B1,B2,::Nothing) = allinplace(r1,r2,B1,B2)
+
+alloutofplace(r1,r2,B1,B2,r1imp) = alloutofplace(r1,r2,B1,B2) && _isoop_r1imp(r1imp)
+alloutofplace(r1,r2,B1,B2,::Nothing) = alloutofplace(r1,r2,B1,B2)
+
+
 allinplace(r1,::Nothing,::Nothing,::Nothing) = _isinplace_r1(r1)
 alloutofplace(r1,::Nothing,::Nothing,::Nothing) = _isoop_r1(r1)
 
 
 
-for (f,nv,nvaux) in ((:r1,5,4),(:r2,4,0),(:B1,4,0),(:B2,4,0),(:C,4,0))
+for (f,nv,nvaux) in ((:r1,5,4),(:r2,4,0),(:r1imp,4,0),(:B1,4,0),(:B2,4,0),(:C,4,0))
   iipfcn = Symbol("_isinplace_",string(f))
   oopfcn = Symbol("_isoop_",string(f))
   completefcn = Symbol("_complete_",string(f))
@@ -234,6 +268,10 @@ _complete_r1(r1::ArrayPartition,::Val{true},_func_cache) =
 _complete_r1(r1::ArrayPartition,::Val{false},_func_cache) =
             SplitFunction((u,p,t) -> (du = deepcopy(u); zero_vec!(du); y = state(u); x = aux_state(u); state(du) .= state_r1(r1)(y,x,p,t); return du),
                           (u,p,t) -> (du = deepcopy(u); zero_vec!(du); aux_state(du) .= aux_r1(r1)(u,p,t); return du))
+
+_complete_r1imp(r1imp,::Val{true},_func_cache) = (du,u,p,t) -> (dy = state(du); x = aux_state(u); r1imp(dy,x,p,t))
+_complete_r1imp(r1imp,::Val{false},_func_cache) = (u,p,t) -> (du = deepcopy(u); zero_vec!(du); x = aux_state(u); state(du) .= r1imp(x,p,t); return du)
+_complete_r1imp(::Nothing,::Val{true},_func_cache) = (du,u,p,t) -> zero_vec!(du)
 
 
 _complete_r2(r2,::Val{true},_func_cache) = (du,u,p,t) -> (dz = constraint(du); x = aux_state(u); r2(dz,x,p,t))
