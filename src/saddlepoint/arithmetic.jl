@@ -74,7 +74,7 @@ end
 
 function ldiv!(sol::Union{Tuple{AbstractVector{T},AbstractVector{T}},AbstractVectorOfArray{T}},sys::SaddleSystem{T,Ns,Nc},
               rhs::Union{Tuple{AbstractVector{T},AbstractVector{T}},AbstractVectorOfArray{T}}) where {T,Ns,Nc}
-    @unpack A⁻¹, B₂, B₁ᵀ, B₂A⁻¹r₁, P, S⁻¹, _f_buf, A⁻¹B₁ᵀf = sys
+    @unpack A⁻¹, B₂, B₁ᵀ, B₂A⁻¹r₁, P, S⁻¹, _f_buf, _u_buf, A⁻¹B₁ᵀf = sys
 
     N = Ns+Nc
     u,f = sol
@@ -92,7 +92,9 @@ function ldiv!(sol::Union{Tuple{AbstractVector{T},AbstractVector{T}},AbstractVec
         f .= S⁻¹*_f_buf
         f .= P*f
     end
-    A⁻¹B₁ᵀf .= A⁻¹*B₁ᵀ*f
+    _u_buf .= B₁ᵀ*f
+    mul!(A⁻¹B₁ᵀf,A⁻¹,_u_buf)
+
     u .-= A⁻¹B₁ᵀf
 
 
