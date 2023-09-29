@@ -268,12 +268,15 @@ end
 
 
 @muladd function perform_step!(integrator,cache::LiskaIFHERKCache{sc,ni,solverType},repeat_step=false) where {sc,ni,solverType}
+
+
     @unpack t,dt,uprev,u,f,p,alg,opts = integrator
     @unpack internalnorm = opts
     @unpack maxiter, tol = alg
     @unpack k1,k2,k3,utmp,udiff,dutmp,fsalfirst,Hhalfdt,Hzero,S,ptmp,k = cache
     @unpack ã11,ã21,ã22,ã31,ã32,ã33,c̃1,c̃2,c̃3 = cache.tab
     @unpack param_update_func = f
+
 
     init_err = float(1)
     init_iter = ni ? 1 : maxiter
@@ -286,7 +289,8 @@ end
     pnew_ptr = ptmp
 
     ttmp = t
-    u .= uprev
+    @.. u = uprev
+
 
     ## Stage 1
     _ode_full_rhs!(k1,f,u,pold_ptr,ttmp)
@@ -295,7 +299,7 @@ end
     @.. utmp = uprev + k1
     ttmp = t + dt*c̃1
 
-    u .= utmp
+    @.. u = utmp
 
     # if applicable, update p, construct new saddle system here, using Hhalfdt
     # and solve system. Solve iteratively if saddle operators depend on
@@ -306,7 +310,7 @@ end
       param_update_func(pnew_ptr,u,pold_ptr,ttmp)
       S[1] = SaddleSystem(S[1],Hhalfdt,f,pnew_ptr,pold_ptr,cache)
       _constraint_r2!(utmp,f,u,pnew_ptr,ttmp) # only updates the z part
-      mainvector(u) .= S[1]\mainvector(utmp)
+      ldiv!(mainvector(u),S[1],mainvector(utmp))
       @.. udiff -= u
       numiter += 1
       err = internalnorm(udiff,ttmp)
@@ -321,6 +325,7 @@ end
 
     @.. k1 = (k1-utmp)/(dt*ã11)  # r1(y,t) - B1T*z
 
+
     ## Stage 2
     _ode_full_rhs!(k2,f,u,pold_ptr,ttmp)
     stats_field(integrator).nf += 1
@@ -328,7 +333,7 @@ end
     @.. utmp = uprev + k2 + dt*ã21*k1
     ttmp = t + dt*c̃2
 
-    u .= utmp
+    @.. u = utmp
 
     # if applicable, update p, construct new saddle system here, using Hhalfdt
     err, numiter = init_err, init_iter
@@ -337,7 +342,7 @@ end
       param_update_func(pnew_ptr,u,pold_ptr,ttmp)
       S[2] = SaddleSystem(S[2],Hhalfdt,f,pnew_ptr,pold_ptr,cache)
       _constraint_r2!(utmp,f,u,pnew_ptr,ttmp)
-      mainvector(u) .= S[2]\mainvector(utmp)
+      ldiv!(mainvector(u),S[2],mainvector(utmp))
       @.. udiff -= u
       numiter += 1
       err = internalnorm(udiff,ttmp)
@@ -353,6 +358,7 @@ end
 
     @.. k2 = (k2-utmp)/(dt*ã22)
 
+
     ## Stage 3
     _ode_full_rhs!(k3,f,u,pold_ptr,ttmp)
     stats_field(integrator).nf += 1
@@ -360,7 +366,7 @@ end
     @.. utmp = uprev + k3 + dt*ã32*k2 + dt*ã31*k1
     ttmp = t + dt
 
-    u .= utmp
+    @.. u = utmp
 
     # if applicable, update p, construct new saddle system here, using Hzero (identity)
     err, numiter = init_err, init_iter
@@ -369,7 +375,7 @@ end
       param_update_func(pnew_ptr,u,pold_ptr,ttmp)
       S[3] = SaddleSystem(S[3],Hzero,f,pnew_ptr,pold_ptr,cache)
       _constraint_r2!(utmp,f,u,pnew_ptr,t+dt)
-      mainvector(u) .= S[3]\mainvector(utmp)
+      ldiv!(mainvector(u),S[3],mainvector(utmp))
       @.. udiff -= u
       numiter += 1
       err = internalnorm(udiff,ttmp)
@@ -381,6 +387,7 @@ end
     param_update_func(p,u,ptmp,t+dt)
     f.odef(integrator.fsallast, u, p, t+dt)
     stats_field(integrator).nf += 1
+
 
     return nothing
 end
@@ -437,7 +444,7 @@ end
       pnew_ptr = ptmp
       S = SaddleSystem(Hhalfdt,f,pnew_ptr,pold_ptr,ducache,solverType;cfact=1.0/(ã11*dt))
       constraint(utmp) .= constraint(_constraint_r2(f,u,pnew_ptr,ttmp))
-      mainvector(u) .= S\mainvector(utmp)
+      ldiv!(mainvector(u),S,mainvector(utmp))
       B1_times_z!(ducache,S)
 
       @.. udiff -= u
@@ -468,7 +475,7 @@ end
       ptmp = param_update_func(u,pold_ptr,ttmp)
       S = SaddleSystem(Hhalfdt,f,ptmp,pold_ptr,ducache,solverType;cfact=1.0/(ã22*dt))
       constraint(utmp) .= constraint(_constraint_r2(f,u,ptmp,ttmp))
-      mainvector(u) .= S\mainvector(utmp)
+      ldiv!(mainvector(u),S,mainvector(utmp))
       B1_times_z!(ducache,S)
       @.. udiff -= u
       numiter += 1
@@ -499,7 +506,7 @@ end
       ptmp = param_update_func(u,pold_ptr,ttmp)
       S = SaddleSystem(Hzero,f,ptmp,pold_ptr,ducache,solverType;cfact=1.0/(ã33*dt))
       constraint(utmp) .= constraint(_constraint_r2(f,u,ptmp,ttmp))
-      mainvector(u) .= S\mainvector(utmp)
+      ldiv!(mainvector(u),S,mainvector(utmp))
       @.. udiff -= u
       numiter += 1
       err = internalnorm(udiff,ttmp)
@@ -572,7 +579,7 @@ end
       param_update_func(pnew_ptr,u,pold_ptr,ttmp)
       S[1] = SaddleSystem(S[1],Hdt,f,pnew_ptr,pold_ptr,cache)
       _constraint_r2!(utmp,f,u,pnew_ptr,t+dt)
-      mainvector(u) .= S[1]\mainvector(utmp)
+      ldiv!(mainvector(u),S[1],mainvector(utmp))
       @.. udiff -= u
       numiter += 1
       err = internalnorm(udiff,ttmp)
@@ -635,7 +642,7 @@ end
     pnew_ptr = param_update_func(u,pold_ptr,t+dt)
     S = SaddleSystem(Hdt,f,pnew_ptr,pold_ptr,ducache,solverType;cfact=1.0/dt)
     constraint(utmp) .= constraint(_constraint_r2(f,u,pnew_ptr,t+dt))
-    mainvector(u) .= S\mainvector(utmp)
+    ldiv!(mainvector(u),S,mainvector(utmp))
     @.. udiff -= u
     numiter += 1
     err = internalnorm(udiff,t+dt)
@@ -738,7 +745,7 @@ end
       param_update_func(pnew_ptr,u,pold_ptr,ttmp)
       S[1] = SaddleSystem(S[1],A,f,pnew_ptr,pnew_ptr,cache)
       _constraint_r2!(utmp,f,u,pnew_ptr,t+dt)
-      mainvector(u) .= S[1]\mainvector(utmp)
+      ldiv!(mainvector(u),S[1],mainvector(utmp))
       @.. udiff -= u
       numiter += 1
       err = internalnorm(udiff,ttmp)
@@ -832,7 +839,7 @@ end
     pnew_ptr = param_update_func(u,pold_ptr,t+dt)
     S = SaddleSystem(A,f,pnew_ptr,pnew_ptr,ducache,solverType;cfact=1.0/(α̃1*dt))
     constraint(utmp) .= constraint(_constraint_r2(f,u,pnew_ptr,t+dt))
-    mainvector(u) .= S\mainvector(utmp)
+    ldiv!(mainvector(u),S,mainvector(utmp))
     @.. udiff -= u
     numiter += 1
     err = internalnorm(udiff,t+dt)

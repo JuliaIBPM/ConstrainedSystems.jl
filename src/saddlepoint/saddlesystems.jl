@@ -14,6 +14,7 @@ struct SaddleSystem{T,Ns,Nc,TU,TF,TS<:SchurSolverType}
     A⁻¹B₁ᵀf :: Vector{T}
     B₂A⁻¹r₁ :: Vector{T}
     _f_buf :: Vector{T}
+    _u_buf :: Vector{T}
     P :: LinearMap{T}
     S :: LinearMap{T}
     S⁻¹ :: LinearMap{T}
@@ -74,7 +75,7 @@ function SaddleSystem(A::LinearMap{T},B₂::LinearMap{T},B₁ᵀ::LinearMap{T},C
     S⁻¹ = _inverse_function(S,solver,kwargs...)
     C⁻¹ = _inverse_function(C,solver,kwargs...)
 
-    return SaddleSystem{T,ns,nc,TU,TF,solver}(A,B₂,B₁ᵀ,C,A⁻¹,C⁻¹,zeros(T,ns),zeros(T,nc),zeros(T,nc),P,S,S⁻¹)
+    return SaddleSystem{T,ns,nc,TU,TF,solver}(A,B₂,B₁ᵀ,C,A⁻¹,C⁻¹,zeros(T,ns),zeros(T,nc),zeros(T,nc),zeros(T,ns),P,S,S⁻¹)
 end
 
 ##### Solver functions #####
