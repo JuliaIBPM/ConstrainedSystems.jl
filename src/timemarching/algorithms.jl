@@ -291,7 +291,6 @@ end
     ttmp = t
     @.. u = uprev
 
-
     ## Stage 1
     _ode_full_rhs!(k1,f,u,pold_ptr,ttmp)
     stats_field(integrator).nf += 1

@@ -168,7 +168,7 @@ function ConstrainedODEFunction(r1,r2,B1,B2,L=DiffEqLinearOperator(0*I),C=nothin
     odef_imp_nl = SplitFunction(_complete_B1(B1,Val(iip)),
                              _complete_r1imp(r1imp,Val(iip));_func_cache=deepcopy(local_cache))
     odef_imp = SplitFunction(L_local,odef_imp_nl;_func_cache=deepcopy(local_cache))
-    odef = SplitFunction(_complete_r1(r1,Val(iip),_func_cache=local_cache), odef_imp ;_func_cache=deepcopy(local_cache))
+    odef = SplitFunction(_complete_r1(r1,Val(iip),_func_cache=deepcopy(local_cache)), odef_imp ;_func_cache=deepcopy(local_cache))
     conf_lhs = SplitFunction(_complete_B2(B2,Val(iip)),_complete_C(C,Val(iip));_func_cache=deepcopy(local_cache))
     conf = SplitFunction(_complete_r2(r2,Val(iip)),conf_lhs;_func_cache=deepcopy(local_cache))
 
@@ -219,7 +219,7 @@ function _ode_full_rhs!(du,f::ConstrainedODEFunction,u,p,t)
   zero_vec!(du)
   _ode_r1!(cache,f,u,p,t)
   _ode_r1imp!(du,f,u,p,t)
-  du .+= cache
+  @.. du += cache
   return du
 end
 
