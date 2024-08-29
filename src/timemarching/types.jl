@@ -6,13 +6,13 @@ DEFAULT_PARAM_UPDATE_FUNC(u,p,t) = p
 
 
 ### Abstract algorithms ###
-abstract type ConstrainedOrdinaryDiffEqAlgorithm <: OrdinaryDiffEq.OrdinaryDiffEqAlgorithm end
+abstract type ConstrainedOrdinaryDiffEqAlgorithm <: OrdinaryDiffEqCore.OrdinaryDiffEqAlgorithm end
 
 ### Abstract caches ###
 # The sc parameter specifies whether it contains static constraint operators or not
 # If false, then it expects that the state vector contains a component for updating the opertors
-abstract type ConstrainedODEMutableCache{sc,solverType} <: OrdinaryDiffEqMutableCache end
-abstract type ConstrainedODEConstantCache{sc,solverType} <: OrdinaryDiffEqConstantCache end
+abstract type ConstrainedODEMutableCache{sc,solverType} <: OrdinaryDiffEqCore.OrdinaryDiffEqMutableCache end
+abstract type ConstrainedODEConstantCache{sc,solverType} <: OrdinaryDiffEqCore.OrdinaryDiffEqConstantCache end
 
 
 #### Operator and function types ####

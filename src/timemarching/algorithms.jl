@@ -251,6 +251,7 @@ end
 
 #######
 
+get_fsalfirstlast(cache::LiskaIFHERKCache, u) = (cache.fsalfirst, cache.k)
 function initialize!(integrator,cache::LiskaIFHERKCache)
     @unpack k,fsalfirst = cache
 
@@ -529,6 +530,7 @@ end
 
 ####
 
+get_fsalfirstlast(cache::IFHEEulerCache, u) = (cache.fsalfirst, cache.k)
 function initialize!(integrator,cache::IFHEEulerCache)
     @unpack k,fsalfirst = cache
 
@@ -663,6 +665,7 @@ end
 
 #### Half-explicit Trapezoidal/Adams-Bashforth 2 (HETrapezoidalAB2) ####
 
+get_fsalfirstlast(cache::HETrapezoidalAB2Cache, u) = (cache.fsalfirst, cache.k)
 function initialize!(integrator,cache::HETrapezoidalAB2Cache)
     @unpack ki,k,fsalfirst = cache
 
