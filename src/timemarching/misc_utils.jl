@@ -28,7 +28,7 @@ end
 #@inline UNITLESS_ABS2(x::AbstractArray) = (isempty(x) && return sum(UNITLESS_ABS2,zero(eltype(x))); sum(UNITLESS_ABS2, x))
 
 # A workaround that avoids redefinition
-import OrdinaryDiffEq.DiffEqBase: UNITLESS_ABS2, ODE_DEFAULT_NORM, recursive_length
+import DiffEqBase: UNITLESS_ABS2, ODE_DEFAULT_NORM, recursive_length
 @inline MY_UNITLESS_ABS2(x::Number) = abs2(x)
 @inline MY_UNITLESS_ABS2(x::AbstractArray) = (isempty(x) && return sum(MY_UNITLESS_ABS2,zero(eltype(x))); sum(MY_UNITLESS_ABS2, x))
 @inline MY_UNITLESS_ABS2(x::ArrayPartition) = sum(MY_UNITLESS_ABS2, x.x)

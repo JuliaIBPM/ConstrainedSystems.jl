@@ -6,15 +6,17 @@ using RecursiveArrayTools
 #using IterativeSolvers
 #using UnPack
 using Reexport
-@reexport using OrdinaryDiffEq
+#@reexport using OrdinaryDiffEq
+@reexport using OrdinaryDiffEqCore
+@reexport using OrdinaryDiffEqTsit5
 
-import OrdinaryDiffEq: OrdinaryDiffEqAlgorithm, alg_order, alg_cache,
+import OrdinaryDiffEqCore: OrdinaryDiffEqAlgorithm, alg_order, alg_cache,
                     OrdinaryDiffEqMutableCache, OrdinaryDiffEqConstantCache,
-                    initialize!, perform_step!, @muladd, @unpack, constvalue,
-                    full_cache, @..
+                    initialize!, perform_step!, constvalue,
+                    full_cache, get_fsalfirstlast, @muladd, @unpack, @..  
 
 
-import OrdinaryDiffEq.DiffEqBase: AbstractDiffEqLinearOperator,
+import DiffEqBase: AbstractDiffEqLinearOperator,
                                   DEFAULT_UPDATE_FUNC, has_exp,
                                   AbstractODEFunction, isinplace, numargs
 
