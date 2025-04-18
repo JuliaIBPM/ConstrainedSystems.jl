@@ -1,4 +1,3 @@
-export DiffEqLinearOperator, ConstrainedODEFunction
 
 
 DEFAULT_PARAM_UPDATE_FUNC(q,u,p,t) = q
@@ -6,7 +5,7 @@ DEFAULT_PARAM_UPDATE_FUNC(u,p,t) = p
 
 
 ### Abstract algorithms ###
-abstract type ConstrainedOrdinaryDiffEqAlgorithm <: OrdinaryDiffEq.OrdinaryDiffEqAlgorithm end
+abstract type ConstrainedOrdinaryDiffEqAlgorithm <: OrdinaryDiffEqAlgorithm end
 
 ### Abstract caches ###
 # The sc parameter specifies whether it contains static constraint operators or not
@@ -14,10 +13,11 @@ abstract type ConstrainedOrdinaryDiffEqAlgorithm <: OrdinaryDiffEq.OrdinaryDiffE
 abstract type ConstrainedODEMutableCache{sc,solverType} <: OrdinaryDiffEqMutableCache end
 abstract type ConstrainedODEConstantCache{sc,solverType} <: OrdinaryDiffEqConstantCache end
 
+get_fsalfirstlast(cache::ConstrainedODEMutableCache, u) = (cache.fsalfirst, cache.k)
 
 #### Operator and function types ####
 
-mutable struct DiffEqLinearOperator{T,aType} <: AbstractDiffEqLinearOperator{T}
+mutable struct DiffEqLinearOperator{T,aType} <: AbstractSciMLOperator{T}
     L :: aType
     DiffEqLinearOperator(L::aType; update_func=DEFAULT_PARAM_UPDATE_FUNC,
                           dtype=Float64) where {aType} = new{dtype,aType}(L)
@@ -116,7 +116,7 @@ struct ConstrainedODEFunction{iip,static,F1,F2,TMM,C,Ta,Tt,TJ,JVP,VJP,JP,SP,TW,T
     odef :: F1
     conf :: F2
     mass_matrix::TMM
-    cache::C
+    _func_cache::C
     analytic::Ta
     tgrad::Tt
     jac::TJ
@@ -214,12 +214,12 @@ end
 
 function _ode_full_rhs!(du,f::ConstrainedODEFunction,u,p,t)
   @unpack odef = f
-  @unpack cache = odef
-  zero_vec!(cache)
+  @unpack _func_cache = odef
+  zero_vec!(_func_cache)
   zero_vec!(du)
-  _ode_r1!(cache,f,u,p,t)
+  _ode_r1!(_func_cache,f,u,p,t)
   _ode_r1imp!(du,f,u,p,t)
-  @.. du += cache
+  @.. du += _func_cache
   return du
 end
 
@@ -301,11 +301,11 @@ _complete_C(C,::Val{false},_func_cache) = (u,p,t) -> (du = deepcopy(u); zero_vec
 
 
 function (f::ConstrainedODEFunction)(du,u,p,t)
-    zero_vec!(f.cache)
+    zero_vec!(f._func_cache)
     zero_vec!(du)
-    f.odef(f.cache,u,p,t)
+    f.odef(f._func_cache,u,p,t)
     f.conf(du,u,p,t)
-    du .+= f.cache
+    du .+= f._func_cache
 end
 
 (f::ConstrainedODEFunction)(u,p,t) = f.odef(u,p,t) + f.conf(u,p,t)

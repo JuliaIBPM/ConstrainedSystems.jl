@@ -1,22 +1,24 @@
 module ConstrainedSystems
 
 using LinearMaps
-#using KrylovKit
 using RecursiveArrayTools
-#using IterativeSolvers
-#using UnPack
 using Reexport
-@reexport using OrdinaryDiffEq
-
-import OrdinaryDiffEq: OrdinaryDiffEqAlgorithm, alg_order, alg_cache,
-                    OrdinaryDiffEqMutableCache, OrdinaryDiffEqConstantCache,
-                    initialize!, perform_step!, @muladd, @unpack, constvalue,
-                    full_cache, @..
+using MuladdMacro
+@reexport using SciMLBase
+using OrdinaryDiffEqCore
 
 
-import OrdinaryDiffEq.DiffEqBase: AbstractDiffEqLinearOperator,
-                                  DEFAULT_UPDATE_FUNC, has_exp,
-                                  AbstractODEFunction, isinplace, numargs
+import MuladdMacro: @muladd     
+import OrdinaryDiffEqCore: OrdinaryDiffEqAlgorithm, OrdinaryDiffEqMutableCache, OrdinaryDiffEqConstantCache, 
+        initialize!, perform_step!, @unpack, constvalue, full_cache, @..,
+        alg_order,alg_cache,full_cache,get_fsalfirstlast               
+
+using SciMLBase: AbstractSciMLOperator,ODEFunction, AbstractODEFunction, SplitFunction,
+                 ODEProblem, init, solve
+
+using DiffEqBase: DEFAULT_UPDATE_FUNC, isinplace, numargs
+import DiffEqBase: has_exp
+import DiffEqBase: UNITLESS_ABS2, ODE_DEFAULT_NORM, recursive_length
 
 import LinearMaps: LinearMap, FunctionMap
 
@@ -32,6 +34,7 @@ export SaddleSystem, SaddleVector, state, constraint, aux_state, linear_map
 export constraint_from_state!
 export solvector, mainvector
 export SchurSolverType, Direct, CG, GMRES, Iterative
+export DiffEqLinearOperator, ConstrainedODEFunction
 
 
 include("vectors.jl")
