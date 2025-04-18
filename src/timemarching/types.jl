@@ -116,7 +116,7 @@ struct ConstrainedODEFunction{iip,static,F1,F2,TMM,C,Ta,Tt,TJ,JVP,VJP,JP,SP,TW,T
     odef :: F1
     conf :: F2
     mass_matrix::TMM
-    cache::C
+    _func_cache::C
     analytic::Ta
     tgrad::Tt
     jac::TJ
@@ -301,11 +301,11 @@ _complete_C(C,::Val{false},_func_cache) = (u,p,t) -> (du = deepcopy(u); zero_vec
 
 
 function (f::ConstrainedODEFunction)(du,u,p,t)
-    zero_vec!(f.cache)
+    zero_vec!(f._func_cache)
     zero_vec!(du)
-    f.odef(f.cache,u,p,t)
+    f.odef(f._func_cache,u,p,t)
     f.conf(du,u,p,t)
-    du .+= f.cache
+    du .+= f._func_cache
 end
 
 (f::ConstrainedODEFunction)(u,p,t) = f.odef(u,p,t) + f.conf(u,p,t)
