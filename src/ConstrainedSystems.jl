@@ -5,6 +5,7 @@ using RecursiveArrayTools
 using Reexport
 using MuladdMacro
 @reexport using SciMLBase
+using OrdinaryDiffEqCore
 
 
 import MuladdMacro: @muladd     
