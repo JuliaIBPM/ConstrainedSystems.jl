@@ -1,4 +1,3 @@
-export DiffEqLinearOperator, ConstrainedODEFunction
 
 
 DEFAULT_PARAM_UPDATE_FUNC(q,u,p,t) = q

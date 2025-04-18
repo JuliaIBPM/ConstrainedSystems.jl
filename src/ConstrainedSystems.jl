@@ -1,12 +1,8 @@
 module ConstrainedSystems
 
 using LinearMaps
-#using KrylovKit
 using RecursiveArrayTools
-#using IterativeSolvers
-#using UnPack
 using Reexport
-#using SciMLBase
 using MuladdMacro
 @reexport using SciMLBase
 
@@ -37,6 +33,7 @@ export SaddleSystem, SaddleVector, state, constraint, aux_state, linear_map
 export constraint_from_state!
 export solvector, mainvector
 export SchurSolverType, Direct, CG, GMRES, Iterative
+export DiffEqLinearOperator, ConstrainedODEFunction
 
 
 include("vectors.jl")
