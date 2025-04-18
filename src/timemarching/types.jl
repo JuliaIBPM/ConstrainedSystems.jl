@@ -6,7 +6,7 @@ DEFAULT_PARAM_UPDATE_FUNC(u,p,t) = p
 
 
 ### Abstract algorithms ###
-abstract type ConstrainedOrdinaryDiffEqAlgorithm <: OrdinaryDiffEq.OrdinaryDiffEqAlgorithm end
+abstract type ConstrainedOrdinaryDiffEqAlgorithm <: OrdinaryDiffEqAlgorithm end
 
 ### Abstract caches ###
 # The sc parameter specifies whether it contains static constraint operators or not
@@ -14,10 +14,11 @@ abstract type ConstrainedOrdinaryDiffEqAlgorithm <: OrdinaryDiffEq.OrdinaryDiffE
 abstract type ConstrainedODEMutableCache{sc,solverType} <: OrdinaryDiffEqMutableCache end
 abstract type ConstrainedODEConstantCache{sc,solverType} <: OrdinaryDiffEqConstantCache end
 
+get_fsalfirstlast(cache::ConstrainedODEMutableCache, u) = (cache.fsalfirst, cache.k)
 
 #### Operator and function types ####
 
-mutable struct DiffEqLinearOperator{T,aType} <: AbstractDiffEqLinearOperator{T}
+mutable struct DiffEqLinearOperator{T,aType} <: AbstractSciMLOperator{T}
     L :: aType
     DiffEqLinearOperator(L::aType; update_func=DEFAULT_PARAM_UPDATE_FUNC,
                           dtype=Float64) where {aType} = new{dtype,aType}(L)
@@ -214,12 +215,12 @@ end
 
 function _ode_full_rhs!(du,f::ConstrainedODEFunction,u,p,t)
   @unpack odef = f
-  @unpack cache = odef
-  zero_vec!(cache)
+  @unpack _func_cache = odef
+  zero_vec!(_func_cache)
   zero_vec!(du)
-  _ode_r1!(cache,f,u,p,t)
+  _ode_r1!(_func_cache,f,u,p,t)
   _ode_r1imp!(du,f,u,p,t)
-  @.. du += cache
+  @.. du += _func_cache
   return du
 end
 

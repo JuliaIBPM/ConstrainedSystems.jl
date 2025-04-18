@@ -1,6 +1,7 @@
 using DiffEqDevTools
 import DiffEqDevTools: recursive_mean
 import ConstrainedSystems: @unpack, _l2norm
+using SciMLBase: solve
 
 dts = 1 ./ 2 .^(9:-1:5)
 testTol = 0.2
