@@ -26,7 +26,7 @@ end
 
 # LiskaIFHERK
 
-@cache struct LiskaIFHERKCache{sc,ni,solverType,uType,rateType,expType1,expType2,saddleType,pType,TabType} <: ConstrainedODEMutableCache{sc,solverType}
+@cache struct LiskaIFHERKCache{sc,ni,solverType,uType,rateType,expType1,expType2,saddleType,pType,TabType,expCType} <: ConstrainedODEMutableCache{sc,solverType}
   u::uType
   uprev::uType # qi
   k1::rateType # w1
@@ -42,6 +42,7 @@ end
   ptmp::pType
   k::rateType
   tab::TabType
+  exp_cache::expCType
 end
 
 struct LiskaIFHERKConstantCache{sc,ni,solverType,T,T2} <: ConstrainedODEConstantCache{sc,solverType}
@@ -70,10 +71,10 @@ struct LiskaIFHERKConstantCache{sc,ni,solverType,T,T2} <: ConstrainedODEConstant
 end
 
 LiskaIFHERKCache{sc,ni,solverType}(u,uprev,k1,k2,k3,utmp,udiff,dutmp,fsalfirst,
-                                Hhalfdt,Hzero,S,ptmp,k,tab) where {sc,ni,solverType} =
+                                Hhalfdt,Hzero,S,ptmp,k,tab,exp_cache) where {sc,ni,solverType} =
         LiskaIFHERKCache{sc,ni,solverType,typeof(u),typeof(k1),typeof(Hhalfdt),typeof(Hzero),
-                        typeof(S),typeof(ptmp),typeof(tab)}(u,uprev,k1,k2,k3,utmp,udiff,dutmp,fsalfirst,
-                                                          Hhalfdt,Hzero,S,ptmp,k,tab)
+                        typeof(S),typeof(ptmp),typeof(tab),typeof(exp_cache)}(u,uprev,k1,k2,k3,utmp,udiff,dutmp,fsalfirst,
+                                                          Hhalfdt,Hzero,S,ptmp,k,tab,exp_cache)
 
 function alg_cache(alg::LiskaIFHERK{solverType},u,rate_prototype,uEltypeNoUnits,uBottomEltypeNoUnits,
                    tTypeNoUnits,uprev,uprev2,f,t,dt,reltol,p,calck,::Val{true}) where {solverType}
@@ -137,15 +138,17 @@ function alg_cache_finish(alg::LiskaIFHERK{solverType},sc,ni,u,uprev,k1,k2,k3,ut
   push!(S,SaddleSystem(Hhalfdt,f,p,p,dutmp,solverType;cfact=1.0/(ã22*dt)))
   push!(S,SaddleSystem(Hzero,f,p,p,dutmp,solverType;cfact=1.0/(ã33*dt)))
 
+  exp_cache = (f,dt)
+
   LiskaIFHERKCache{sc,ni,solverType}(u,uprev,k1,k2,k3,utmp,udiff,dutmp,fsalfirst,
-                                  Hhalfdt,Hzero,S,deepcopy(p),k,tab)
+                                  Hhalfdt,Hzero,S,deepcopy(p),k,tab,exp_cache)
 
 end
 
 
 # IFHEEuler
 
-@cache struct IFHEEulerCache{sc,ni,solverType,uType,rateType,expType,saddleType,pType} <: ConstrainedODEMutableCache{sc,solverType}
+@cache struct IFHEEulerCache{sc,ni,solverType,uType,rateType,expType,saddleType,pType,expCType} <: ConstrainedODEMutableCache{sc,solverType}
   u::uType
   uprev::uType # qi
   k1::rateType # w1
@@ -157,6 +160,7 @@ end
   S::saddleType
   ptmp::pType
   k::rateType
+  exp_cache::expCType
 end
 
 struct IFHEEulerConstantCache{sc,ni,solverType} <: ConstrainedODEConstantCache{sc,solverType}
@@ -164,10 +168,10 @@ struct IFHEEulerConstantCache{sc,ni,solverType} <: ConstrainedODEConstantCache{s
 end
 
 IFHEEulerCache{sc,ni,solverType}(u,uprev,k1,utmp,udiff,dutmp,fsalfirst,
-                                Hdt,S,ptmp,k) where {sc,ni,solverType} =
+                                Hdt,S,ptmp,k,exp_cache) where {sc,ni,solverType} =
         IFHEEulerCache{sc,ni,solverType,typeof(u),typeof(k1),typeof(Hdt),
-                        typeof(S),typeof(ptmp)}(u,uprev,k1,utmp,udiff,dutmp,fsalfirst,
-                                                              Hdt,S,ptmp,k)
+                        typeof(S),typeof(ptmp),typeof(exp_cache)}(u,uprev,k1,utmp,udiff,dutmp,fsalfirst,
+                                                              Hdt,S,ptmp,k,exp_cache)
 
 function alg_cache(alg::IFHEEuler{solverType},u,rate_prototype,uEltypeNoUnits,uBottomEltypeNoUnits,
                    tTypeNoUnits,uprev,uprev2,f,t,dt,reltol,p,calck,::Val{true}) where {solverType}
@@ -211,14 +215,16 @@ function alg_cache_finish(alg::IFHEEuler{solverType},sc,ni,u,uprev,k1,utmp,udiff
   S = []
   push!(S,SaddleSystem(Hdt,f,p,p,dutmp,solverType;cfact=1.0/dt))
 
+  exp_cache = (f,dt)
+
   IFHEEulerCache{sc,ni,solverType}(u,uprev,k1,utmp,udiff,dutmp,fsalfirst,
-                                  Hdt,S,deepcopy(p),k)
+                                  Hdt,S,deepcopy(p),k,exp_cache)
 
 end
 
 # Half-explicit trapezoidal-Adams/Bashforth 2 (HETrapezoidalAB2)
 
-@cache struct HETrapezoidalAB2Cache{sc,ni,solverType,uType,rateType,implicitType,saddleType,pType,TabType} <: ConstrainedODEMutableCache{sc,solverType}
+@cache struct HETrapezoidalAB2Cache{sc,ni,solverType,uType,rateType,implicitType,saddleType,pType,TabType,expCType} <: ConstrainedODEMutableCache{sc,solverType}
   u::uType
   uprev::uType
   ki::rateType
@@ -232,7 +238,34 @@ end
   ptmp::pType
   k::rateType
   tab::TabType
+  exp_cache::expCType
 end
+
+struct HETrapezoidalAB2CacheSerialization{sc,ni,solverType,uType,rateType,implicitType,saddleType,pType,TabType,expCType}
+  u::uType
+  uprev::uType
+  ki::rateType
+  ke::rateType
+  utmp::uType  # cache
+  udiff::uType
+  dutmp::rateType # cache for rates
+  fsalfirst::rateType
+  ptmp::pType
+  k::rateType
+  tab::TabType
+  exp_cache::expCType
+end
+
+JLD2.writeas(::Type{<:HETrapezoidalAB2Cache}) = HETrapezoidalAB2CacheSerialization
+
+Base.convert(::Type{<:HETrapezoidalAB2CacheSerialization}, a::HETrapezoidalAB2Cache) = 
+    HETrapezoidalAB2CacheSerialization(a.u,a.uprev,a.ki,a.ke,a.utmp,a.udiff,a.dutmp,a.fsalfirst,a.ptmp,a.k,a.tab)
+
+function Base.convert(::Type{<:HETrapezoidalAB2Cache}, a::HETrapezoidalAB2CacheSerialization{sc,ni,solverType}) where {sc,ni,solverType}
+    f, dt = exp_cache 
+    alg_cache_finish(HETrapezoidalAB2,sc,ni,a.u,a.uprev,a.ki,a.ke,a.utmp,a.udiff,a.dutmp,a.fsalfirst,a.p,a.k,a.tab,f,dt)
+end
+
 
 struct HETrapezoidalAB2ConstantCache{sc,ni,solverType,T} <: ConstrainedODEConstantCache{sc,solverType}
   α̃1::T
@@ -249,9 +282,9 @@ struct HETrapezoidalAB2ConstantCache{sc,ni,solverType,T} <: ConstrainedODEConsta
 end
 
 HETrapezoidalAB2Cache{sc,ni,solverType}(u,uprev,ki,ke,utmp,udiff,dutmp,fsalfirst,
-                                A,S,ptmp,k,tab) where {sc,ni,solverType} =
+                                A,S,ptmp,k,tab,exp_cache) where {sc,ni,solverType} =
         HETrapezoidalAB2Cache{sc,ni,solverType,typeof(u),typeof(ki),typeof(A),
-                        typeof(S),typeof(ptmp),typeof(tab)}(u,uprev,ki,ke,utmp,udiff,dutmp,fsalfirst,A,S,ptmp,k,tab)
+                        typeof(S),typeof(ptmp),typeof(tab),typeof(exp_cache)}(u,uprev,ki,ke,utmp,udiff,dutmp,fsalfirst,A,S,ptmp,k,tab,exp_cache)
 
 
 
@@ -304,8 +337,10 @@ function alg_cache_finish(alg::HETrapezoidalAB2{solverType},sc,ni,u,uprev,ki,ke,
   push!(S,SaddleSystem(A,f,p,p,dutmp,solverType;cfact=1.0/(α̃1*dt)))
   push!(S,SaddleSystem(A,f,p,p,dutmp,solverType;cfact=1.0/dt))
 
+  exp_cache = (f,dt)
+
   HETrapezoidalAB2Cache{sc,ni,solverType}(u,uprev,ki,ke,utmp,udiff,dutmp,fsalfirst,
-                                  A,S,deepcopy(p),k,tab)
+                                  A,S,deepcopy(p),k,tab,exp_cache)
 end
 
 #######
