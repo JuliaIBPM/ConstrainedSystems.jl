@@ -80,7 +80,7 @@ function alg_cache(alg::LiskaIFHERK{solverType},u,rate_prototype,uEltypeNoUnits,
 
   u isa ArrayPartition || error("u must be of type ArrayPartition")
 
-  y, z = state(u), constraint(u)
+  #y, z = state(u), constraint(u)
 
   utmp, udiff = (zero(u) for i in 1:2)
   k1, k2, k3, dutmp, fsalfirst, k = (zero(rate_prototype) for i in 1:6)
@@ -90,6 +90,41 @@ function alg_cache(alg::LiskaIFHERK{solverType},u,rate_prototype,uEltypeNoUnits,
 
   tab = LiskaIFHERKConstantCache{sc,ni,solverType}(constvalue(uBottomEltypeNoUnits),
                                                 constvalue(tTypeNoUnits))
+
+  #=                                                
+  @unpack ã11,ã22,ã33 = tab
+
+  L = _fetch_ode_L(f)
+  Hhalfdt = exp(L,-dt/2,y)
+  Hzero = exp(L,zero(dt),y)
+
+  S = []
+  push!(S,SaddleSystem(Hhalfdt,f,p,p,dutmp,solverType;cfact=1.0/(ã11*dt)))
+  push!(S,SaddleSystem(Hhalfdt,f,p,p,dutmp,solverType;cfact=1.0/(ã22*dt)))
+  push!(S,SaddleSystem(Hzero,f,p,p,dutmp,solverType;cfact=1.0/(ã33*dt)))
+
+  LiskaIFHERKCache{sc,ni,solverType}(u,uprev,k1,k2,k3,utmp,udiff,dutmp,fsalfirst,
+                                  Hhalfdt,Hzero,S,deepcopy(p),k,tab)
+  =#
+  return alg_cache_finish(alg,sc,ni,u,uprev,k1,k2,k3,utmp,udiff,dutmp,fsalfirst,p,k,tab,f,dt)
+
+
+end
+
+function alg_cache(alg::LiskaIFHERK{solverType},u,rate_prototype,
+                                  uEltypeNoUnits,uBottomEltypeNoUnits,
+                                  tTypeNoUnits,uprev,uprev2,f,t,dt,reltol,
+                                  p,calck,::Val{false}) where {solverType}
+  LiskaIFHERKConstantCache{isstatic(f),
+                           needs_iteration(f,u,p,rate_prototype),
+                           solverType}(constvalue(uBottomEltypeNoUnits),
+                                          constvalue(tTypeNoUnits))
+end
+
+
+function alg_cache_finish(alg::LiskaIFHERK{solverType},sc,ni,u,uprev,k1,k2,k3,utmp,udiff,dutmp,fsalfirst,p,k,tab,f,dt) where {solverType}
+
+  y, z = state(u), constraint(u)
 
   @unpack ã11,ã22,ã33 = tab
 
@@ -102,19 +137,9 @@ function alg_cache(alg::LiskaIFHERK{solverType},u,rate_prototype,uEltypeNoUnits,
   push!(S,SaddleSystem(Hhalfdt,f,p,p,dutmp,solverType;cfact=1.0/(ã22*dt)))
   push!(S,SaddleSystem(Hzero,f,p,p,dutmp,solverType;cfact=1.0/(ã33*dt)))
 
-
   LiskaIFHERKCache{sc,ni,solverType}(u,uprev,k1,k2,k3,utmp,udiff,dutmp,fsalfirst,
                                   Hhalfdt,Hzero,S,deepcopy(p),k,tab)
-end
 
-function alg_cache(alg::LiskaIFHERK{solverType},u,rate_prototype,
-                                  uEltypeNoUnits,uBottomEltypeNoUnits,
-                                  tTypeNoUnits,uprev,uprev2,f,t,dt,reltol,
-                                  p,calck,::Val{false}) where {solverType}
-  LiskaIFHERKConstantCache{isstatic(f),
-                           needs_iteration(f,u,p,rate_prototype),
-                           solverType}(constvalue(uBottomEltypeNoUnits),
-                                          constvalue(tTypeNoUnits))
 end
 
 
@@ -149,13 +174,37 @@ function alg_cache(alg::IFHEEuler{solverType},u,rate_prototype,uEltypeNoUnits,uB
 
   u isa ArrayPartition || error("u must be of type ArrayPartition")
 
-  y, z = state(u), constraint(u)
+  #y, z = state(u), constraint(u)
 
   utmp, udiff = (zero(u) for i in 1:2)
   k1, dutmp, fsalfirst, k = (zero(rate_prototype) for i in 1:4)
 
   sc = isstatic(f)
   ni = needs_iteration(f,u,p,rate_prototype)
+
+  #=
+  Hdt = exp(_fetch_ode_L(f),-dt,y)
+
+  S = []
+  push!(S,SaddleSystem(Hdt,f,p,p,dutmp,solverType;cfact=1.0/dt))
+
+  IFHEEulerCache{sc,ni,solverType}(u,uprev,k1,utmp,udiff,dutmp,fsalfirst,
+                                  Hdt,S,deepcopy(p),k)
+  =#
+  alg_cache_finish(alg,sc,ni,u,uprev,k1,utmp,udiff,dutmp,fsalfirst,p,k,f,dt)
+  
+end
+
+function alg_cache(alg::IFHEEuler{solverType},u,rate_prototype,
+                                  uEltypeNoUnits,uBottomEltypeNoUnits,
+                                  tTypeNoUnits,uprev,uprev2,f,t,dt,reltol,
+                                  p,calck,::Val{false}) where {solverType}
+  IFHEEulerConstantCache{isstatic(f),needs_iteration(f,u,p,rate_prototype),solverType}()
+end
+
+function alg_cache_finish(alg::IFHEEuler{solverType},sc,ni,u,uprev,k1,utmp,udiff,dutmp,fsalfirst,p,k,f,dt) where {solverType}
+
+  y, z = state(u), constraint(u)
 
   Hdt = exp(_fetch_ode_L(f),-dt,y)
 
@@ -164,13 +213,7 @@ function alg_cache(alg::IFHEEuler{solverType},u,rate_prototype,uEltypeNoUnits,uB
 
   IFHEEulerCache{sc,ni,solverType}(u,uprev,k1,utmp,udiff,dutmp,fsalfirst,
                                   Hdt,S,deepcopy(p),k)
-end
 
-function alg_cache(alg::IFHEEuler{solverType},u,rate_prototype,
-                                  uEltypeNoUnits,uBottomEltypeNoUnits,
-                                  tTypeNoUnits,uprev,uprev2,f,t,dt,reltol,
-                                  p,calck,::Val{false}) where {solverType}
-  IFHEEulerConstantCache{isstatic(f),needs_iteration(f,u,p,rate_prototype),solverType}()
 end
 
 # Half-explicit trapezoidal-Adams/Bashforth 2 (HETrapezoidalAB2)
@@ -217,7 +260,7 @@ function alg_cache(alg::HETrapezoidalAB2{solverType},u,rate_prototype,uEltypeNoU
 
   u isa ArrayPartition || error("u must be of type ArrayPartition")
 
-  y, z = state(u), constraint(u)
+  #y, z = state(u), constraint(u)
 
   utmp, udiff = (zero(u) for i in 1:2)
   ki, ke, dutmp, fsalfirst, k = (zero(rate_prototype) for i in 1:5)
@@ -227,6 +270,7 @@ function alg_cache(alg::HETrapezoidalAB2{solverType},u,rate_prototype,uEltypeNoU
 
   tab = HETrapezoidalAB2ConstantCache{sc,ni,solverType}(constvalue(uBottomEltypeNoUnits))
 
+  #=
   @unpack α̃1 = tab
 
   A = implicit_operator(_fetch_ode_L(f),α̃1*dt)
@@ -238,6 +282,9 @@ function alg_cache(alg::HETrapezoidalAB2{solverType},u,rate_prototype,uEltypeNoU
 
   HETrapezoidalAB2Cache{sc,ni,solverType}(u,uprev,ki,ke,utmp,udiff,dutmp,fsalfirst,
                                   A,S,deepcopy(p),k,tab)
+  =#
+  alg_cache_finish(alg,sc,ni,u,uprev,ki,ke,utmp,udiff,dutmp,fsalfirst,p,k,tab,f,dt)
+  
 end
 
 function alg_cache(alg::HETrapezoidalAB2{solverType},u,rate_prototype,
@@ -247,7 +294,19 @@ function alg_cache(alg::HETrapezoidalAB2{solverType},u,rate_prototype,
   HETrapezoidalAB2ConstantCache{isstatic(f),needs_iteration(f,u,p,rate_prototype),solverType}(constvalue(uBottomEltypeNoUnits))
 end
 
+function alg_cache_finish(alg::HETrapezoidalAB2{solverType},sc,ni,u,uprev,ki,ke,utmp,udiff,dutmp,fsalfirst,p,k,tab,f,dt) where {solverType}
 
+  @unpack α̃1 = tab
+
+  A = implicit_operator(_fetch_ode_L(f),α̃1*dt)
+
+  S = []
+  push!(S,SaddleSystem(A,f,p,p,dutmp,solverType;cfact=1.0/(α̃1*dt)))
+  push!(S,SaddleSystem(A,f,p,p,dutmp,solverType;cfact=1.0/dt))
+
+  HETrapezoidalAB2Cache{sc,ni,solverType}(u,uprev,ki,ke,utmp,udiff,dutmp,fsalfirst,
+                                  A,S,deepcopy(p),k,tab)
+end
 
 #######
 
