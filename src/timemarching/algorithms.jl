@@ -96,8 +96,8 @@ function alg_cache(alg::LiskaIFHERK{solverType},u,rate_prototype,uEltypeNoUnits,
   @unpack ã11,ã22,ã33 = tab
 
   L = _fetch_ode_L(f)
-  Hhalfdt = exp(L,-dt/2,y)
-  Hzero = exp(L,zero(dt),y)
+  Hhalfdt = exp_op(L,-dt/2,y)
+  Hzero = exp_op(L,zero(dt),y)
 
   S = []
   push!(S,SaddleSystem(Hhalfdt,f,p,p,dutmp,solverType;cfact=1.0/(ã11*dt)))
@@ -123,15 +123,15 @@ function alg_cache(alg::LiskaIFHERK{solverType},u,rate_prototype,
 end
 
 
-function alg_cache_finish(alg::LiskaIFHERK{solverType},sc,ni,u,uprev,k1,k2,k3,utmp,udiff,dutmp,fsalfirst,p,k,tab,f,dt) where {solverType}
+function alg_cache_finish(::LiskaIFHERK{solverType},sc,ni,u,uprev,k1,k2,k3,utmp,udiff,dutmp,fsalfirst,p,k,tab,f,dt) where {solverType}
 
   y, z = state(u), constraint(u)
 
   @unpack ã11,ã22,ã33 = tab
 
   L = _fetch_ode_L(f)
-  Hhalfdt = exp(L,-dt/2,y)
-  Hzero = exp(L,zero(dt),y)
+  Hhalfdt = exp_op(L,-dt/2,y)
+  Hzero = exp_op(L,zero(dt),y)
 
   S = []
   push!(S,SaddleSystem(Hhalfdt,f,p,p,dutmp,solverType;cfact=1.0/(ã11*dt)))
@@ -187,7 +187,7 @@ function alg_cache(alg::IFHEEuler{solverType},u,rate_prototype,uEltypeNoUnits,uB
   ni = needs_iteration(f,u,p,rate_prototype)
 
   #=
-  Hdt = exp(_fetch_ode_L(f),-dt,y)
+  Hdt = exp_op(_fetch_ode_L(f),-dt,y)
 
   S = []
   push!(S,SaddleSystem(Hdt,f,p,p,dutmp,solverType;cfact=1.0/dt))
@@ -206,11 +206,11 @@ function alg_cache(alg::IFHEEuler{solverType},u,rate_prototype,
   IFHEEulerConstantCache{isstatic(f),needs_iteration(f,u,p,rate_prototype),solverType}()
 end
 
-function alg_cache_finish(alg::IFHEEuler{solverType},sc,ni,u,uprev,k1,utmp,udiff,dutmp,fsalfirst,p,k,f,dt) where {solverType}
+function alg_cache_finish(::IFHEEuler{solverType},sc,ni,u,uprev,k1,utmp,udiff,dutmp,fsalfirst,p,k,f,dt) where {solverType}
 
   y, z = state(u), constraint(u)
 
-  Hdt = exp(_fetch_ode_L(f),-dt,y)
+  Hdt = exp_op(_fetch_ode_L(f),-dt,y)
 
   S = []
   push!(S,SaddleSystem(Hdt,f,p,p,dutmp,solverType;cfact=1.0/dt))
@@ -241,29 +241,31 @@ end
   exp_cache::expCType
 end
 
-struct HETrapezoidalAB2CacheSerialization{sc,ni,solverType,uType,rateType,implicitType,saddleType,pType,TabType,expCType}
-  u::uType
-  uprev::uType
-  ki::rateType
-  ke::rateType
-  utmp::uType  # cache
-  udiff::uType
-  dutmp::rateType # cache for rates
-  fsalfirst::rateType
-  ptmp::pType
-  k::rateType
-  tab::TabType
-  exp_cache::expCType
+struct HETrapezoidalAB2CacheSerialization
+  sc
+  ni
+  u
+  uprev
+  ki
+  ke
+  utmp 
+  udiff
+  dutmp
+  fsalfirst
+  ptmp
+  k
+  tab
+  exp_cache
 end
 
 JLD2.writeas(::Type{<:HETrapezoidalAB2Cache}) = HETrapezoidalAB2CacheSerialization
 
-Base.convert(::Type{<:HETrapezoidalAB2CacheSerialization}, a::HETrapezoidalAB2Cache) = 
-    HETrapezoidalAB2CacheSerialization(a.u,a.uprev,a.ki,a.ke,a.utmp,a.udiff,a.dutmp,a.fsalfirst,a.ptmp,a.k,a.tab)
+Base.convert(::Type{HETrapezoidalAB2CacheSerialization}, a::HETrapezoidalAB2Cache{sc,ni}) where {sc,ni} = 
+    HETrapezoidalAB2CacheSerialization(a.sc,a.ni,a.u,a.uprev,a.ki,a.ke,a.utmp,a.udiff,a.dutmp,a.fsalfirst,a.ptmp,a.k,a.tab.a.exp_cache)
 
-function Base.convert(::Type{<:HETrapezoidalAB2Cache}, a::HETrapezoidalAB2CacheSerialization{sc,ni,solverType}) where {sc,ni,solverType}
-    f, dt = exp_cache 
-    alg_cache_finish(HETrapezoidalAB2,sc,ni,a.u,a.uprev,a.ki,a.ke,a.utmp,a.udiff,a.dutmp,a.fsalfirst,a.p,a.k,a.tab,f,dt)
+function Base.convert(::Type{HETrapezoidalAB2Cache}, a::HETrapezoidalAB2CacheSerialization)
+    f, dt = a.exp_cache 
+    alg_cache_finish(HETrapezoidalAB2(),sc,ni,a.u,a.uprev,a.ki,a.ke,a.utmp,a.udiff,a.dutmp,a.fsalfirst,a.ptmp,a.k,a.tab,f,dt)
 end
 
 
@@ -327,7 +329,7 @@ function alg_cache(alg::HETrapezoidalAB2{solverType},u,rate_prototype,
   HETrapezoidalAB2ConstantCache{isstatic(f),needs_iteration(f,u,p,rate_prototype),solverType}(constvalue(uBottomEltypeNoUnits))
 end
 
-function alg_cache_finish(alg::HETrapezoidalAB2{solverType},sc,ni,u,uprev,ki,ke,utmp,udiff,dutmp,fsalfirst,p,k,tab,f,dt) where {solverType}
+function alg_cache_finish(::HETrapezoidalAB2{solverType},sc,ni,u,uprev,ki,ke,utmp,udiff,dutmp,fsalfirst,p,k,tab,f,dt) where {solverType}
 
   @unpack α̃1 = tab
 
@@ -514,8 +516,8 @@ end
     ducache = deepcopy(uprev)
     ptmp = deepcopy(p)
     L = _fetch_ode_L(f)
-    Hhalfdt = exp(L,-dt/2,state(uprev))
-    Hzero = exp(L,zero(dt),state(uprev))
+    Hhalfdt = exp_op(L,-dt/2,state(uprev))
+    Hzero = exp_op(L,zero(dt),state(uprev))
     pold_ptr = p
 
     ## Stage 1
@@ -718,7 +720,7 @@ end
   ducache = deepcopy(uprev)
   ptmp = deepcopy(p)
   L = _fetch_ode_L(f)
-  Hdt = exp(L,-dt,state(uprev))
+  Hdt = exp_op(L,-dt,state(uprev))
   pold_ptr = p
   pnew_ptr = ptmp
 

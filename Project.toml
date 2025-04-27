@@ -5,7 +5,6 @@ repo = "https://github.com/JuliaIBPM/ConstrainedSystems.jl.git"
 version = "0.3.9"
 
 [deps]
-BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
 DiffEqBase = "2b5f629d-d688-5b77-993f-72d75c75574e"
 IterativeSolvers = "42fd0dbc-a981-5370-80f2-aaf504508153"
 JLD2 = "033835bb-8acc-5ee8-8aae-3f567f8a3819"
@@ -14,28 +13,33 @@ LinearMaps = "7a12625a-238d-50fd-b39a-03d52299707e"
 MuladdMacro = "46d2c3a1-f734-5fdb-9937-b9b9aeba4221"
 OrdinaryDiffEqCore = "bbf590c4-e513-4bbe-9b18-05decba2e5d8"
 OrdinaryDiffEqTsit5 = "b1df2697-797e-41e3-8120-5422d3b24e4a"
-PkgBenchmark = "32113eaa-f34f-5b0d-bd6c-c81e245fc73d"
 RecursiveArrayTools = "731186ca-8d62-57ce-b412-fbd966d074cd"
 Reexport = "189a3867-3050-52da-a836-e630ba90ab69"
 SciMLBase = "0bca4576-84f4-4d90-8ffe-ffa030f20462"
 
 [compat]
-BenchmarkTools = "0.5, 1"
+Aqua = "0.8.11"
+CartesianGrids = "0.2.2"
 DiffEqBase = "6.167.2"
+DiffEqDevTools = "2"
 IterativeSolvers = "0.9"
 JLD2 = "0.5.13"
 LinearAlgebra = "1.10"
 LinearMaps = "^2.4, 3.2, 3.3"
+Literate = "2"
 MuladdMacro = "0.2.4"
 OrdinaryDiffEqCore = "1.22.0"
 OrdinaryDiffEqTsit5 = "1.1.0"
-PkgBenchmark = "0.2.10"
+Plots = "1"
+Random = "1.10"
 RecursiveArrayTools = "2.2 - 2.38.5, 2.38.6, 3"
 Reexport = "0.2.0, 1.0"
 SciMLBase = "2.84.0"
+Test = "1.10"
 julia = "1.10"
 
 [extras]
+Aqua = "4c88cf16-eb10-579e-8560-4a9242c79595"
 CartesianGrids = "3e975e5d-2cf8-4263-9573-8460aaf534d9"
 DiffEqDevTools = "f3b72e0c-5b89-59e1-b016-84e28bfd966d"
 Literate = "98b081ad-f1c9-55d3-8b20-4c87d4299306"
@@ -44,4 +48,4 @@ Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["Test", "Random", "Literate", "Plots", "CartesianGrids", "DiffEqDevTools"]
+test = ["Test", "Aqua", "Random", "Literate", "Plots", "CartesianGrids", "DiffEqDevTools"]

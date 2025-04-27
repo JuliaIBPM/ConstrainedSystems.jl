@@ -54,6 +54,10 @@ if GROUP == "All" || GROUP == "Convergence"
   include("algconvergence.jl")
 end
 
+if GROUP == "All" || GROUP == "Aqua"
+  include("aqua.jl")
+end
+
 if GROUP == "All" || GROUP == "Literate"
   for (root, dirs, files) in walkdir(litdir)
     for file in files

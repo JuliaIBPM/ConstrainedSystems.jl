@@ -28,12 +28,13 @@ end
 #@inline UNITLESS_ABS2(x::AbstractArray) = (isempty(x) && return sum(UNITLESS_ABS2,zero(eltype(x))); sum(UNITLESS_ABS2, x))
 
 # A workaround that avoids redefinition
+#=
 @inline MY_UNITLESS_ABS2(x::Number) = abs2(x)
 @inline MY_UNITLESS_ABS2(x::AbstractArray) = (isempty(x) && return sum(MY_UNITLESS_ABS2,zero(eltype(x))); sum(MY_UNITLESS_ABS2, x))
 @inline MY_UNITLESS_ABS2(x::ArrayPartition) = sum(MY_UNITLESS_ABS2, x.x)
 
 @inline ODE_DEFAULT_NORM(u::ArrayPartition,t) = sqrt(MY_UNITLESS_ABS2(u)/recursive_length(u))
-
+=#
 
 @inline _l2norm(u) = sqrt(recursive_mean(map(x -> float(x).^2,u)))
 
@@ -48,7 +49,8 @@ function zero_vec!(u::ArrayPartition)
 end
 
 
-
+# These do not appear to be necessary anymore
+#=
 function recursivecopy!(dest :: T, src :: T) where {T}
     fields = fieldnames(T)
     for f in fields
@@ -58,13 +60,16 @@ function recursivecopy!(dest :: T, src :: T) where {T}
     end
     dest
 end
+=#
 
+#=
 function recursivecopy!(dest :: AbstractArray{T}, src :: AbstractArray{T}) where {T}
     for i in eachindex(src)
         recursivecopy!(dest[i],src[i])
     end
     return dest
 end
+=#
 
 
 # Seed the state vector with two sets of random values, apply the constraint operator on a
