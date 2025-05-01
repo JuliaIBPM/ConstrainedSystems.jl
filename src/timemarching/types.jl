@@ -321,6 +321,10 @@ for (f,nv,nvaux) in ((:r1,5,4),(:r2,4,0),(:r1imp,4,0),(:B1,4,0),(:B2,4,0),(:C,4,
   @eval $completefcn(::Nothing,::Val{false},_func_cache) = (u,p,t) -> zero(u)
 end
 
+#=
+We need to create functions that take arguments (du,u,p,t) for in-place
+or (u,p,t) for out-of-place. 
+=#
 _complete_r1(r1,::Val{true},_func_cache) = (du,u,p,t) -> (dy = state(du); y = state(u); x = aux_state(u); r1(dy,y,x,p,t))
 _complete_r1(r1,::Val{false},_func_cache) = (u,p,t) -> (du = deepcopy(u); zero_vec!(du); y = state(u); x = aux_state(u); state(du) .= r1(y,x,p,t); return du)
 _complete_r1(r1::ArrayPartition,::Val{true},_func_cache) =
