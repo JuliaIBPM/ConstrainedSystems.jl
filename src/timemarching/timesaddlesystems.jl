@@ -1,6 +1,6 @@
 
 # called directly by alg_cache for iip algorithms and indirectly by non-sc algorithms
-function SaddleSystem(A,f::ConstrainedODEFunction{true},p,pold,ducache,solver;cfact=1.0)
+function SaddleSystem(A,f::ConstrainedODEFunction{true},p,pold,ducache,solver::Type{<:SchurSolverType};cfact=1.0)
     nully, nullz = state(ducache), constraint(ducache)
     du_aux = aux_state(ducache)
     @inline B₁ᵀ(z) = (zero_vec!(ducache);
@@ -16,7 +16,7 @@ function SaddleSystem(A,f::ConstrainedODEFunction{true},p,pold,ducache,solver;cf
 end
 
 # called directly by oop algorithms
-function SaddleSystem(A,f::ConstrainedODEFunction{false},p,pold,ducache,solver;cfact=1.0)
+function SaddleSystem(A,f::ConstrainedODEFunction{false},p,pold,ducache,solver::Type{<:SchurSolverType};cfact=1.0)
 
     nully, nullz = state(ducache), constraint(ducache)
     du_aux = aux_state(ducache)
@@ -32,8 +32,8 @@ function SaddleSystem(A,f::ConstrainedODEFunction{false},p,pold,ducache,solver;c
 end
 
 # this version is called by in-place algorithms
-@inline SaddleSystem(S::SaddleSystem,A,f::ConstrainedODEFunction,p,pold,
-                      cache::ConstrainedODEMutableCache{sc,solverType}) where {sc,solverType} =
+@inline SaddleSystem(S::SaddleSystem,A,f::ConstrainedODEFunction{iip},p,pold,
+                      cache::ConstrainedODEMutableCache{sc,solverType}) where {iip,sc,solverType} =
           SaddleSystem(S,A,f,p,pold,cache.dutmp,solverType,Val(sc))
 
 # non-static constraints
