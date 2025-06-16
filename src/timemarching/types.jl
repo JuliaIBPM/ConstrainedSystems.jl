@@ -23,10 +23,10 @@ mutable struct DiffEqLinearOperator{T,aType} <: AbstractSciMLOperator{T}
                           dtype=Float64) where {aType} = new{dtype,aType}(L)
 end
 
-(f::DiffEqLinearOperator)(du,u,p,t) = (dy = state(du); mul!(dy,f.L,state(u)))
-(f::DiffEqLinearOperator)(du::Number,u::Number,p,t) = (du = f.L*u)
+(f::DiffEqLinearOperator)(du,u,v,p,t) = (dy = state(du); mul!(dy,f.L,state(u)))
+(f::DiffEqLinearOperator)(du::Number,u::Number,v,p,t) = (du = f.L*u)
 
-(f::DiffEqLinearOperator)(u,p,t) = (du = deepcopy(u); zero_vec!(du); dy = state(du); mul!(dy,f.L,state(u)); return du)
+(f::DiffEqLinearOperator)(u,v,p,t) = (du = deepcopy(u); zero_vec!(du); dy = state(du); mul!(dy,f.L,state(u)); return du)
 
 
 import Base: exp
@@ -240,7 +240,6 @@ function _generate_constrained_ode_functions(r1,r2,B1,B2,L,C,r1imp,param_update_
 
 
   L_local = (L isa DiffEqLinearOperator) ? L : DiffEqLinearOperator(L)
-
 
   odef_imp_nl = SplitFunction(_complete_B1(B1,Val(iip)),
                              _complete_r1imp(r1imp,Val(iip));_func_cache=deepcopy(local_cache))
