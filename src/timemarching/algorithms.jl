@@ -261,11 +261,11 @@ end
 JLD2.writeas(::Type{<:HETrapezoidalAB2Cache}) = HETrapezoidalAB2CacheSerialization
 
 Base.convert(::Type{HETrapezoidalAB2CacheSerialization}, a::HETrapezoidalAB2Cache{sc,ni}) where {sc,ni} = 
-    HETrapezoidalAB2CacheSerialization(a.sc,a.ni,a.u,a.uprev,a.ki,a.ke,a.utmp,a.udiff,a.dutmp,a.fsalfirst,a.ptmp,a.k,a.tab.a.exp_cache)
+    HETrapezoidalAB2CacheSerialization(sc,ni,a.u,a.uprev,a.ki,a.ke,a.utmp,a.udiff,a.dutmp,a.fsalfirst,a.ptmp,a.k,a.tab.a.exp_cache)
 
 function Base.convert(::Type{HETrapezoidalAB2Cache}, a::HETrapezoidalAB2CacheSerialization)
     f, dt = a.exp_cache 
-    alg_cache_finish(HETrapezoidalAB2(),sc,ni,a.u,a.uprev,a.ki,a.ke,a.utmp,a.udiff,a.dutmp,a.fsalfirst,a.ptmp,a.k,a.tab,f,dt)
+    alg_cache_finish(HETrapezoidalAB2(),a.sc,a.ni,a.u,a.uprev,a.ki,a.ke,a.utmp,a.udiff,a.dutmp,a.fsalfirst,a.ptmp,a.k,a.tab,f,dt)
 end
 
 
