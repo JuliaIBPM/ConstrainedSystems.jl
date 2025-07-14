@@ -265,7 +265,7 @@ Base.convert(::Type{HETrapezoidalAB2CacheSerialization}, a::HETrapezoidalAB2Cach
 
 function Base.convert(::Type{HETrapezoidalAB2Cache}, a::HETrapezoidalAB2CacheSerialization)
     f, dt = a.exp_cache 
-    alg_cache_finish(HETrapezoidalAB2(),a.sc,a.ni,a.u,a.uprev,a.ki,a.ke,a.utmp,a.udiff,a.dutmp,a.fsalfirst,a.ptmp,a.k,a.tab,f,dt)
+    alg_cache_finish(HETrapezoidalAB2(),sc,ni,a.u,a.uprev,a.ki,a.ke,a.utmp,a.udiff,a.dutmp,a.fsalfirst,a.ptmp,a.k,a.tab,f,dt)
 end
 
 
