@@ -2,7 +2,7 @@ name = "ConstrainedSystems"
 uuid = "c257ce95-4918-4279-a47c-50fdbcb74a04"
 authors = ["Jeff Eldredge <jdeldre@g.ucla.edu>"]
 repo = "https://github.com/JuliaIBPM/ConstrainedSystems.jl.git"
-version = "0.3.11"
+version = "0.3.12"
 
 [deps]
 DiffEqBase = "2b5f629d-d688-5b77-993f-72d75c75574e"
