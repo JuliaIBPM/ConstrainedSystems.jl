@@ -260,12 +260,13 @@ end
 
 JLD2.writeas(::Type{<:HETrapezoidalAB2Cache}) = HETrapezoidalAB2CacheSerialization
 
-Base.convert(::Type{HETrapezoidalAB2CacheSerialization}, a::HETrapezoidalAB2Cache{sc,ni}) where {sc,ni} = 
-    HETrapezoidalAB2CacheSerialization(a.sc,a.ni,a.u,a.uprev,a.ki,a.ke,a.utmp,a.udiff,a.dutmp,a.fsalfirst,a.ptmp,a.k,a.tab.a.exp_cache)
+function Base.convert(::Type{HETrapezoidalAB2CacheSerialization}, a::HETrapezoidalAB2Cache{sc,ni}) where {sc,ni}
+    HETrapezoidalAB2CacheSerialization(sc,ni,a.u,a.uprev,a.ki,a.ke,a.utmp,a.udiff,a.dutmp,a.fsalfirst,a.ptmp,a.k,a.tab,a.exp_cache)
+end
 
-function Base.convert(::Type{HETrapezoidalAB2Cache}, a::HETrapezoidalAB2CacheSerialization)
+function Base.convert(::Type{HETrapezoidalAB2Cache{sc,ni,solverType,uType,rateType,implicitType,saddleType,pType,TabType,expCType}}, a::HETrapezoidalAB2CacheSerialization) where {sc,ni,solverType,uType,rateType,implicitType,saddleType,pType,TabType,expCType}
     f, dt = a.exp_cache 
-    alg_cache_finish(HETrapezoidalAB2(),sc,ni,a.u,a.uprev,a.ki,a.ke,a.utmp,a.udiff,a.dutmp,a.fsalfirst,a.ptmp,a.k,a.tab,f,dt)
+    alg_cache_finish(HETrapezoidalAB2(),a.sc,a.ni,a.u,a.uprev,a.ki,a.ke,a.utmp,a.udiff,a.dutmp,a.fsalfirst,a.ptmp,a.k,a.tab,f,dt)
 end
 
 
